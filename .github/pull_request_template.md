@@ -1,47 +1,34 @@
+# Pull Request
+
+**Select a template**: [Frontend](?expand=1&template=frontend.md) · [Backend](?expand=1&template=backend.md) · [Model Training](?expand=1&template=model-training.md) · [DevOps](?expand=1&template=devops.md)
+
+---
+
 ## Description
 
-<!-- Provide a brief description of the changes in this PR -->
-
-## Type of Change
-
-<!-- Mark the relevant option with an "x" -->
-
--   [ ] Bug fix (non-breaking change which fixes an issue)
--   [ ] New feature (non-breaking change which adds functionality)
--   [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
--   [ ] Documentation update
--   [ ] Refactoring (no functional changes)
--   [ ] Performance improvement
--   [ ] Configuration change
+<!-- Brief description of changes -->
 
 ## Related Issues
 
-<!-- Link to related issues using #issue_number -->
-
 Closes #
 
-## Changes Made
-
-<!-- List the main changes made in this PR -->
+## Changes
 
 -
 -
--
 
-## Model/Dataset Impact
+## Impact
 
-<!-- If applicable, describe how this affects the models or datasets -->
+<!-- Describe what this affects (models, API, UI, infrastructure, etc.) -->
 
--   [ ] Affects collaborative filtering model
--   [ ] Affects content-based filtering model
--   [ ] Affects two-tower model
--   [ ] Changes dataset preprocessing
--   [ ] Updates embeddings generation
--   [ ] Modifies data pipeline
--   [ ] N/A
+## Testing
+
+<!-- How did you test this? -->
 
 ## Screenshots/Output
 
-<!-- If applicable, add screenshots or relevant output -->
+<!-- If applicable -->
 
 ## Notes
+
+<!-- Any additional context -->
