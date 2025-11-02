@@ -1,0 +1,40 @@
+name: Security Scan
+
+on:
+    pull_request:
+        branches: [main, preprocessing]
+    push:
+        branches: [main, preprocessing]
+    schedule:
+        # Run weekly on Mondays at 9am UTC
+        - cron: "0 9 * * 1"
+
+jobs:
+    pip-audit:
+        name: Scan Python Dependencies
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install pip-audit
+              run: pip install pip-audit
+
+            - name: Scan dependencies in requirements.txt
+              run: |
+                  if [ -f "requirements.txt" ]; then
+                    pip-audit -r requirements.txt
+                  fi
+              continue-on-error: true
+
+            - name: Scan model/requirements.txt
+              run: |
+                  if [ -f "model/requirements.txt" ]; then
+                    pip-audit -r model/requirements.txt
+                  fi
+              continue-on-error: true
