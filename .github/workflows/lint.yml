@@ -22,6 +22,7 @@ jobs:
             - name: Install linting tools
               run: |
                   pip install flake8 black isort
+                  pip install "black[jupyter]"
 
             - name: Run flake8
               run: |
