@@ -1,0 +1,9 @@
+model/data*
+.venv/
+.DS_Store
+
+
+
+
+mvp.md 
+next.md
