@@ -1,0 +1,20 @@
+{
+  "collaborative_filtering": {
+    "num_ratings": 31922307,
+    "num_users": 200948,
+    "num_movies": 83323,
+    "avg_rating": 3.539802261158631,
+    "sparsity": 0.998093461043237
+  },
+  "content_based": {
+    "num_movies": 1312963,
+    "tfidf_dim": 10000,
+    "bert_dim": 384,
+    "bert_model": "sentence-transformers/all-MiniLM-L6-v2"
+  },
+  "two_tower": {
+    "num_samples": 31922307,
+    "num_users": 200948,
+    "num_movies": 83323
+  }
+}
