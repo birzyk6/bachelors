@@ -1,0 +1,51 @@
+name: Lint Code
+
+on:
+    pull_request:
+        branches: [main, preprocessing]
+    push:
+        branches: [main, preprocessing]
+
+jobs:
+    lint-python:
+        name: Lint Python
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install linting tools
+              run: |
+                  pip install flake8 black isort
+
+            - name: Run flake8
+              run: |
+                  flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+                  flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+              continue-on-error: true
+
+            - name: Check code formatting with black
+              run: black --check --diff .
+              continue-on-error: true
+
+            - name: Check import sorting with isort
+              run: isort --check-only --diff .
+              continue-on-error: true
+
+    lint-markdown:
+        name: Lint Markdown
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Lint Markdown files
+              uses: DavidAnson/markdownlint-cli2-action@v16
+              with:
+                  globs: "**/*.md"
+              continue-on-error: true

@@ -1,0 +1,82 @@
+# Label configuration for PR auto-labeling
+# Add labels to PRs based on which files are changed
+
+# Model & Data Science
+model:
+    - changed-files:
+          - any-glob-to-any-file: "model/**/*"
+
+data:
+    - changed-files:
+          - any-glob-to-any-file:
+                - "**/data/**/*"
+                - "**/*.csv"
+                - "**/*.parquet"
+                - "**/*.npy"
+                - "**/*.npz"
+
+preprocessing:
+    - changed-files:
+          - any-glob-to-any-file:
+                - "**/preprocessing.*"
+                - "**/preprocess*"
+
+notebook:
+    - changed-files:
+          - any-glob-to-any-file: "**/*.ipynb"
+
+# Backend
+backend:
+    - changed-files:
+          - any-glob-to-any-file:
+                - "backend/**/*"
+                - "api/**/*"
+                - "server/**/*"
+
+# Frontend
+frontend:
+    - changed-files:
+          - any-glob-to-any-file:
+                - "frontend/**/*"
+                - "client/**/*"
+                - "ui/**/*"
+
+# Documentation
+documentation:
+    - changed-files:
+          - any-glob-to-any-file:
+                - "**/*.md"
+                - "docs/**/*"
+
+# Configuration
+config:
+    - changed-files:
+          - any-glob-to-any-file:
+                - "**/*.yml"
+                - "**/*.yaml"
+                - "**/*.json"
+                - "**/*.toml"
+                - ".github/**/*"
+                - "**/requirements.txt"
+                - "**/package.json"
+
+# DevOps
+devops:
+    - changed-files:
+          - any-glob-to-any-file:
+                - ".github/workflows/**/*"
+                - "docker/**/*"
+                - "Dockerfile"
+                - "docker-compose*.yml"
+                - "k8s/**/*"
+                - "kubernetes/**/*"
+
+# Dependencies
+dependencies:
+    - changed-files:
+          - any-glob-to-any-file:
+                - "**/requirements.txt"
+                - "**/package.json"
+                - "**/package-lock.json"
+                - "**/poetry.lock"
+                - "**/Pipfile.lock"
