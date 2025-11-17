@@ -17,24 +17,17 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
+            - name: Install uv
+              uses: astral-sh/setup-uv@v3
               with:
-                  python-version: "3.11"
+                  enable-cache: true
 
-            - name: Install pip-audit
-              run: pip install pip-audit
+            - name: Set up Python
+              run: uv python install 3.11
 
-            - name: Scan dependencies in requirements.txt
-              run: |
-                  if [ -f "requirements.txt" ]; then
-                    pip-audit -r requirements.txt
-                  fi
-              continue-on-error: true
+            - name: Install dependencies
+              run: uv sync --group dev
 
-            - name: Scan model/requirements.txt
-              run: |
-                  if [ -f "model/requirements.txt" ]; then
-                    pip-audit -r model/requirements.txt
-                  fi
+            - name: Scan dependencies with pip-audit
+              run: uv run pip-audit
               continue-on-error: true
