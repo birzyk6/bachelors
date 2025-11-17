@@ -7,7 +7,7 @@
     "sparsity": 0.998093461043237
   },
   "content_based": {
-    "num_movies": 1312963,
+    "num_movies": 1321934,
     "tfidf_dim": 10000,
     "bert_dim": 384,
     "bert_model": "sentence-transformers/all-MiniLM-L6-v2"
