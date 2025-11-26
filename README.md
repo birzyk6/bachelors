@@ -40,6 +40,24 @@ uv run pre-commit install
 uv run pre-commit run --all-files
 ```
 
+## Common Commands
+
+```bash
+# Run arbitrary Python modules
+uv run python path/to/script.py
+
+# Launch notebooks
+uv run jupyter notebook
+
+# Format & lint
+uv run black .
+uv run isort .
+uv run flake8 .
+
+# Train and evaluate recommendation models on a manageable subset
+uv run python model/train_models.py --sample-users 300 --min-interactions 25 --max-rows 100000
+```
+
 ## Project Structure
 
 ```

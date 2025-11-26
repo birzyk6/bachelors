@@ -1,9 +1,63 @@
-model/data*
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
 .venv/
+venv/
+env/
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
+# Logs / temp
+*.log
+*.tmp
+*.swp
+*.swo
 
+# Jupyter
+.ipynb_checkpoints/
 
+# VS Code / IDEs
+.vscode/
+.idea/
+*.iml
 
-mvp.md 
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Caches
+*.cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+coverage.xml
+htmlcov/
+
+# Project data / models
+model/data*
+data/
+*.pickle
+*.pkl
+
+# Environment / secrets
+.env
+.env.*
+*.secret
+*.key
+
+# OS trash
+.Trash-*/
+Thumbs.db
+ehthumbs.db
+
+# Markdown notes (if you don't want them tracked)
+mvp.md
 next.md
