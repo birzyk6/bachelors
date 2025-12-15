@@ -1,0 +1,18 @@
+{
+  "model": "knn",
+  "params": {
+    "k": 40,
+    "similarity": "cosine",
+    "user_based": false,
+    "max_movies": 20000,
+    "min_support": 1
+  },
+  "val_metrics": {
+    "rmse": 0.8559999943901679,
+    "mae": 0.6331907373971796
+  },
+  "test_metrics": {
+    "rmse": 0.8564635654689079,
+    "mae": 0.6338522555381865
+  }
+}

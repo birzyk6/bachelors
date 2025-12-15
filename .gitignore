@@ -61,3 +61,16 @@ ehthumbs.db
 # Markdown notes (if you don't want them tracked)
 mvp.md
 next.md
+
+GETTING_STARTED.md
+INSTRUCTIONS.md
+TEST_MODE.md
+
+*.pb
+.keras
+
+model/saved_models/*
+
+mlflow.db
+mlruns/
+quick_test.sh

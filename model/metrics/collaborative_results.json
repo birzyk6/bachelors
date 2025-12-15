@@ -1,0 +1,18 @@
+{
+  "model": "collaborative_filtering",
+  "params": {
+    "n_factors": 100,
+    "n_epochs": 20,
+    "lr_all": 0.005,
+    "reg_all": 0.02,
+    "random_state": 42
+  },
+  "val_metrics": {
+    "rmse": 0.7710330799703371,
+    "mae": 0.5821651550582092
+  },
+  "test_metrics": {
+    "rmse": 0.771561513617985,
+    "mae": 0.5826192830822347
+  }
+}

@@ -1,74 +1,176 @@
-# Bachelor's Thesis - Movie Recommendation System
+# Bachelor's Thesis: Recommendation Systems
 
-👉🤓👈
+**Comparative Study of Recommendation Algorithms with Production-Ready Two-Tower Model**
 
-## Overview
+Author: Bartek | Date: December 2024
 
-Movie recommendation system using collaborative filtering, content-based filtering, and two-tower models.
+---
 
-## Setup
+## 🎯 Project Overview
 
-This project uses [uv](https://github.com/astral-sh/uv) for fast Python package management.
+This project implements and compares **5 recommendation algorithms** for movie recommendations, with a focus on building a production-ready **Two-Tower Model** suitable for deployment with TensorFlow Serving and Qdrant vector database.
 
-### Install uv
+### Implemented Models
+
+| Model                              | Type          | Framework               | Description                               |
+| ---------------------------------- | ------------- | ----------------------- | ----------------------------------------- |
+| **Collaborative Filtering**        | Memory-Based  | scikit-surprise         | SVD-based matrix factorization            |
+| **Content-Based**                  | Feature-Based | TensorFlow + BERT       | Uses movie overviews with BERT embeddings |
+| **KNN**                            | Memory-Based  | scikit-surprise         | Item-based K-Nearest Neighbors            |
+| **Neural Collaborative Filtering** | Deep Learning | TensorFlow              | GMF + MLP fusion architecture             |
+| **Two-Tower Model**                | Deep Learning | TensorFlow Recommenders | Query + Candidate tower retrieval         |
+
+### Datasets
+
+-   **MovieLens 32M**: 32 million ratings, 87,585 movies, 200,948 users (1995-2023)
+-   **TMDB 2023**: Movie metadata with 930k+ movies (overviews, genres, budgets)
+
+---
+
+## 🚀 Quick Start
+
+### 1. Environment Setup
 
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-### Install Dependencies
-
-```bash
-# Install all dependencies
+# Install dependencies with uv
 uv sync
 
-# Install with dev dependencies
-uv sync --group dev
-```
+# Activate virtual environment
+source .venv/bin/activate
 
-### Pre-commit Hooks
-
-```bash
 # Install pre-commit hooks
-uv run pre-commit install
-
-# Run hooks manually on all files
-uv run pre-commit run --all-files
+pre-commit install
 ```
 
-## Common Commands
+### 2. Download Datasets
 
 ```bash
-# Run arbitrary Python modules
-uv run python path/to/script.py
+# Download MovieLens 32M (~900MB)
+bash model/data/download_movielens.sh
 
-# Launch notebooks
-uv run jupyter notebook
-
-# Format & lint
-uv run black .
-uv run isort .
-uv run flake8 .
-
-# Train and evaluate recommendation models on a manageable subset
-uv run python model/train_models.py --sample-users 300 --min-interactions 25 --max-rows 100000
+# Download TMDB 2023 (~270MB)
+bash model/data/download_tmdb.sh
 ```
 
-## Project Structure
+### 3. Preprocess Data
+
+```bash
+export TEST_MODE=false # to preprocess large dataset (32ml)
+export TEST_MODE=true # to preprocess smaller dataset (latest_ml)
+python -m model.src.data.preprocessing
+```
+
+This creates train/val/test splits in `model/data/processed/`.
+
+### 4. Train Models
+
+```bash
+export TEST_MODE=false # to train on large dataset (32ml)
+export TEST_MODE=true # to train on smaller dataset (latest_ml)
+python ./train_all_model.py
+```
+
+### 5. Evaluate Models
+
+```bash
+# Run full evaluation suite
+python -m model.src.evaluation.run_evaluation
+
+# View results
+cat model/metrics/results.json
+```
+
+### 6. Generate Thesis Plots
+
+```bash
+# Create all visualizations
+python -m model.src.visualization.generate_plots
+
+# Plots saved to model/plots/
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 bachelors/
-├── model/
-│   ├── preprocessing.ipynb    # Data preprocessing pipeline
-│   ├── requirements.txt       # Model-specific dependencies (legacy)
-│   └── data/                  # Dataset storage
-├── .github/
-│   ├── workflows/             # CI/CD pipelines
-│   └── PULL_REQUEST_TEMPLATE/ # PR templates
-├── pyproject.toml             # Project dependencies and config
-└── README.md
+├── INSTRUCTIONS.md              # Master plan (detailed guide)
+├── README.md                    # This file
+├── pyproject.toml               # Dependencies
+│
+└── model/
+    ├── data/
+    │   ├── raw/                 # Downloaded datasets
+    │   ├── processed/           # Train/val/test splits
+    │   ├── download_movielens.sh
+    │   └── download_tmdb.py
+    │
+    ├── src/
+    │   ├── data/
+    │   │   └── preprocessing.py  # Data pipeline
+    │   ├── models/
+    │   │   ├── base.py
+    │   │   ├── collaborative.py
+    │   │   ├── content_based.py
+    │   │   ├── knn.py
+    │   │   ├── ncf.py
+    │   │   ├── two_tower.py
+    │   │   └── export_two_tower.py
+    │   ├── evaluation/
+    │   │   ├── metrics.py
+    │   │   └── run_evaluation.py
+    │   └── visualization/
+    │       ├── plots.py
+    │       └── generate_plots.py
+    │
+    ├── plots/                    # Thesis figures
+    ├── metrics/                  # Evaluation results
+    ├── experiments/              # MLflow tracking
+    └── saved_models/             # Exported models
 ```
+
+---
+
+## 📊 Evaluation Metrics
+
+### Regression (Rating Prediction)
+
+-   **RMSE** (Root Mean Squared Error)
+-   **MAE** (Mean Absolute Error)
+
+### Ranking (Top-K Recommendations)
+
+-   **Precision@K** - Fraction of relevant items in top-K
+-   **Recall@K** - Fraction of relevant items retrieved
+-   **NDCG@K** - Normalized Discounted Cumulative Gain (position-aware)
+-   **MRR** - Mean Reciprocal Rank
+
+---
+
+## 🎨 Thesis Visualizations
+
+Generated plots (300 DPI, publication-quality):
+
+-   `rmse_comparison.png` - RMSE across all models
+-   `ndcg_comparison.png` - NDCG@10 comparison
+-   `recall_at_k.png` - Recall@K curves
+-   `learning_curves_ncf.png` - NCF training curves
+-   `learning_curves_two_tower.png` - Two-Tower training curves
+-   `embedding_tsne.png` - t-SNE of movie embeddings
+-   `rating_distribution.png` - Rating histogram
+-   `genre_distribution.png` - Genre frequencies
+
+---
+
+## 📝 Development
+
+### MLflow Tracking
+
+```bash
+mlflow server --port 5000
+
+# View at http://localhost:5000
+```
+
+---

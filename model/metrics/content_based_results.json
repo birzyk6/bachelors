@@ -1,0 +1,15 @@
+{
+  "model": "content_based",
+  "params": {
+    "embedding_model": "https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-512_A-8/2",
+    "similarity_metric": "cosine"
+  },
+  "val_metrics": {
+    "rmse": 1.2037469678481085,
+    "mae": 0.9399435083864618
+  },
+  "test_metrics": {
+    "rmse": 1.2048695150977162,
+    "mae": 0.9406651454376844
+  }
+}
