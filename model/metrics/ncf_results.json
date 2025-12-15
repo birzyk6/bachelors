@@ -1,0 +1,28 @@
+{
+  "model": "ncf",
+  "params": {
+    "num_users": 200949,
+    "num_movies": 80159,
+    "embedding_dim": 64,
+    "mlp_layers": [
+      128,
+      64,
+      32
+    ],
+    "dropout_rate": 0.2,
+    "learning_rate": 0.001
+  },
+  "training_params": {
+    "epochs": 10,
+    "batch_size": 256
+  },
+  "val_metrics": {
+    "rmse": 0.7830093845406383,
+    "mae": 0.5986754387364746
+  },
+  "test_metrics": {
+    "rmse": 0.7836189335834334,
+    "mae": 0.5993101157031686
+  },
+  "final_epoch": 5
+}
