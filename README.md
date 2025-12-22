@@ -27,6 +27,15 @@ This project implements and compares **5 recommendation algorithms** for movie r
 
 ---
 
+## � Documentation
+
+-   **[DATA_PREPROCESSING.md](DATA_PREPROCESSING.md)** - Detailed guide to dataset combination and preprocessing
+-   **[DATA_PIPELINE.md](DATA_PIPELINE.md)** - Complete data pipeline architecture and flow
+-   **[INSTRUCTIONS.md](INSTRUCTIONS.md)** - Master plan and implementation guide
+-   **[TEST_MODE.md](TEST_MODE.md)** - Quick testing with small dataset
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Environment Setup
@@ -60,7 +69,7 @@ export TEST_MODE=true # to preprocess smaller dataset (latest_ml)
 python -m model.src.data.preprocessing
 ```
 
-This creates train/val/test splits in `model/data/processed/`.
+This creates train/val/test splits in `model/data/processed/`. See [DATA_PREPROCESSING.md](DATA_PREPROCESSING.md) for details.
 
 ### 4. Train Models
 
@@ -122,10 +131,19 @@ bachelors/
     │   │   └── run_evaluation.py
     │   └── visualization/
     │       ├── plots.py
-    │       └── generate_plots.py
+    │       ├── generate_plots.py
+    │       ├── embedding_plots.py
+    │       ├── two_tower_plots.py
+    │       ├── eda_plots.py
+    │       └── dataset_eda.py
     │
     ├── plots/                    # Thesis figures
-    ├── metrics/                  # Evaluation results
+    │   ├── models/              # Model comparison plots
+    │   ├── embeddings/          # Embedding visualizations
+    │   ├── two_tower/           # Two-Tower specific plots
+    │   └── eda/                 # Exploratory data analysis
+    │       └── datasets/        # Dataset comparison plots
+    ├── metrics/                  # Evaluation results + dataset stats
     ├── experiments/              # MLflow tracking
     └── saved_models/             # Exported models
 ```
@@ -152,14 +170,42 @@ bachelors/
 
 Generated plots (300 DPI, publication-quality):
 
--   `rmse_comparison.png` - RMSE across all models
--   `ndcg_comparison.png` - NDCG@10 comparison
--   `recall_at_k.png` - Recall@K curves
--   `learning_curves_ncf.png` - NCF training curves
--   `learning_curves_two_tower.png` - Two-Tower training curves
--   `embedding_tsne.png` - t-SNE of movie embeddings
--   `rating_distribution.png` - Rating histogram
--   `genre_distribution.png` - Genre frequencies
+### Model Comparisons
+
+-   `models/rmse_comparison.png` - RMSE across all models
+-   `models/recall_at_k.png` - Recall@K curves
+-   `models/porownanie_predykcji_modeli.png` - Model predictions comparison (Polish)
+
+### Embeddings
+
+-   `embeddings/rated_movies/rated_comparison.png` - Dimensionality reduction comparison (t-SNE, PCA, UMAP)
+-   `embeddings/rated_movies/podobienstwo_kosinusowe.png` - Cosine similarity heatmap
+-   `embeddings/tmdb_full/tmdb_comparison.png` - TMDB embeddings visualization
+
+### Two-Tower Model
+
+-   `two_tower/architektura_modelu.png` - Model architecture diagram
+-   `two_tower/rekomendacje_przykladowe.png` - Example recommendations
+-   `two_tower/macierz_podobienstwa.png` - Similarity heatmap
+
+### Dataset Analysis
+
+-   `eda/datasets/porownanie_rozmiarow.png` - Dataset sizes comparison
+-   `eda/datasets/wspolne_filmy.png` - Movie overlap between datasets
+-   `eda/datasets/wzbogacenie_tmdb.png` - TMDB metadata enrichment
+-   `eda/datasets/porownanie_gatunkow.png` - Genre distribution comparison
+-   `eda/datasets/pokrycie_czasowe.png` - Temporal coverage
+-   `eda/datasets/pipeline_przetwarzania.png` - Data preprocessing pipeline
+
+### Generate All Plots
+
+```bash
+# Main visualizations
+python -m model.src.visualization.generate_plots
+
+# Dataset EDA
+python -m model.src.visualization.dataset_eda
+```
 
 ---
 

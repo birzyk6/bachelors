@@ -74,3 +74,4 @@ model/saved_models/*
 mlflow.db
 mlruns/
 quick_test.sh
+DATA*.md

@@ -99,7 +99,15 @@ def print_recommendations(results: List[Tuple[int, float, str]], title: str = "R
         return
 
     for i, (movie_id, score, info) in enumerate(results, 1):
-        print_movie_result(i, info, score=score)
+        # Negative score indicates a title match (sorted by popularity)
+        if score < 0:
+            # It's a title match - show ★ MATCH instead of similarity score
+            popularity = -score  # We stored -popularity
+            print(f"  {i:2d}. {info} {Colors.GREEN}★ MATCH{Colors.END}")
+        else:
+            # It's a similar movie - show similarity percentage
+            similarity_pct = score * 100
+            print(f"  {i:2d}. {info} {Colors.CYAN}[{similarity_pct:.0f}% similar]{Colors.END}")
 
     print()
 
@@ -171,8 +179,24 @@ def print_help() -> None:
 
   {Colors.CYAN}genres{Colors.END}              List all available genres
 
-  {Colors.CYAN}help{Colors.END}                Show this help message
+{Colors.BOLD}User Impersonation:{Colors.END}
+  {Colors.CYAN}users{Colors.END}               Show sample active users
+  {Colors.CYAN}user <id>{Colors.END}           Impersonate a user (e.g., user 12345)
+  {Colors.CYAN}history{Colors.END}             Show user's watch history
+  {Colors.CYAN}whoami{Colors.END}              Show current user info
+  {Colors.CYAN}logout{Colors.END}              Stop impersonating user
 
+{Colors.BOLD}Personalized Recommendations (when impersonating):{Colors.END}
+  {Colors.CYAN}recommend{Colors.END}             General personalized picks
+  {Colors.CYAN}recommend popular{Colors.END}     Popular movies matching your taste
+  {Colors.CYAN}recommend recent{Colors.END}      Based on your most recent watch
+  {Colors.CYAN}recommend discover{Colors.END}    Explore outside your comfort zone
+  {Colors.CYAN}recommend gems{Colors.END}        Hidden gems you might love
+  {Colors.CYAN}recommend <theme>{Colors.END}     Themed picks (e.g., 'recommend vampires')
+                       Examples: recommend space, recommend 90s comedy
+
+{Colors.BOLD}Other:{Colors.END}
+  {Colors.CYAN}help{Colors.END}                Show this help message
   {Colors.CYAN}quit{Colors.END}                Exit the program
 
 {Colors.BOLD}How it works:{Colors.END}
@@ -182,6 +206,9 @@ def print_help() -> None:
   1. It finds movies matching your text (titles, genres)
   2. Uses their embeddings to find similar movies
   3. Combines results to give you the best recommendations
+
+  When impersonating a user, it uses their learned embedding from
+  the Two-Tower model to find movies they would likely enjoy!
 """
     )
 

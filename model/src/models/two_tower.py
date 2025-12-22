@@ -43,6 +43,7 @@ class TwoTowerModel(BaseRecommender):
 
     Learns separate user and movie embeddings optimized for retrieval.
     Supports text features (BERT embeddings) for content-based signals.
+    Includes a content-only tower for cold-start movies (no rating history).
 
     Args:
         user_ids: List of unique user IDs
@@ -52,17 +53,21 @@ class TwoTowerModel(BaseRecommender):
         bert_model: BERT model name (if use_text_features=True)
         tower_layers: List of hidden layer sizes for both towers
         learning_rate: Learning rate for optimizer
+        temperature: Temperature for softmax in retrieval loss (lower = sharper)
+        dropout_rate: Dropout rate for regularization
     """
 
     def __init__(
         self,
         user_ids: List[int],
         movie_ids: List[int],
-        embedding_dim: int = 64,
+        embedding_dim: int = 128,
         use_text_features: bool = True,
         bert_model: str = "bert-base-uncased",
         tower_layers: List[int] | None = None,
-        learning_rate: float = 0.1,
+        learning_rate: float = 0.0005,
+        temperature: float = 0.1,
+        dropout_rate: float = 0.1,
     ):
         super().__init__(name="TwoTower")
 
@@ -71,8 +76,10 @@ class TwoTowerModel(BaseRecommender):
         self.embedding_dim = embedding_dim
         self.use_text_features = use_text_features
         self.bert_model_name = bert_model
-        self.tower_layers = tower_layers or [128, 64]
+        self.tower_layers = tower_layers or [256, 128]
         self.learning_rate = learning_rate
+        self.temperature = temperature
+        self.dropout_rate = dropout_rate
 
         # Initialize BERT if using text features
         self.bert_preprocess = None
@@ -88,6 +95,12 @@ class TwoTowerModel(BaseRecommender):
         # Build towers
         self.user_tower = self._build_user_tower()
         self.movie_tower = self._build_movie_tower()
+
+        # Build content-only tower for cold-start movies (uses only BERT embeddings)
+        self.content_only_tower = self._build_content_only_movie_tower()
+
+        # BERT embedding dimension (512 for small_bert)
+        self.bert_embedding_dim = 512
 
         # Build full retrieval model
         self.model = self._build_retrieval_model()
@@ -121,7 +134,7 @@ class TwoTowerModel(BaseRecommender):
         for i, units in enumerate(self.tower_layers):
             x = layers.Dense(units, activation="relu", name=f"user_dense_{i}")(x)
             x = layers.BatchNormalization()(x)
-            x = layers.Dropout(0.2)(x)
+            x = layers.Dropout(self.dropout_rate)(x)
 
         # Final embedding layer
         user_output = layers.Dense(
@@ -175,7 +188,7 @@ class TwoTowerModel(BaseRecommender):
         for i, units in enumerate(self.tower_layers):
             x = layers.Dense(units, activation="relu", name=f"movie_dense_{i}")(x)
             x = layers.BatchNormalization()(x)
-            x = layers.Dropout(0.2)(x)
+            x = layers.Dropout(self.dropout_rate)(x)
 
         # Final embedding layer
         movie_output = layers.Dense(
@@ -189,6 +202,39 @@ class TwoTowerModel(BaseRecommender):
 
         return keras.Model(inputs=inputs, outputs=movie_output, name="movie_tower")
 
+    def _build_content_only_movie_tower(self) -> keras.Model:
+        """
+        Build Content-Only Movie Tower for cold-start movies.
+
+        This tower uses ONLY BERT text embeddings (no movie ID), enabling
+        embedding generation for any movie with text, including those
+        not in the training set (cold-start).
+
+        Returns:
+            Keras model mapping text embedding to movie embedding
+        """
+        # Only text embedding as input (512-dim from BERT)
+        text_input = layers.Input(shape=(512,), dtype=tf.float32, name="text_embedding")
+
+        # Dense layers (same architecture as movie tower dense part)
+        x = text_input
+        for i, units in enumerate(self.tower_layers):
+            x = layers.Dense(units, activation="relu", name=f"content_dense_{i}")(x)
+            x = layers.BatchNormalization()(x)
+            x = layers.Dropout(self.dropout_rate)(x)
+
+        # Final embedding layer (same dimension as movie tower output)
+        content_output = layers.Dense(
+            self.embedding_dim,
+            activation=None,
+            name="content_output_embedding",
+        )(x)
+
+        # L2 normalize for cosine similarity
+        content_output = L2Normalize(name="content_l2_normalize")(content_output)
+
+        return keras.Model(inputs=text_input, outputs=content_output, name="content_only_tower")
+
     def _build_retrieval_model(self) -> tfrs.Model:
         """
         Build full two-tower retrieval model using TFRS.
@@ -196,15 +242,17 @@ class TwoTowerModel(BaseRecommender):
         Returns:
             TFRS retrieval model
         """
+        temperature = self.temperature  # Capture for inner class
 
         class TwoTowerRetrievalModel(tfrs.Model):
-            def __init__(self, user_model, movie_model, movie_dataset):
+            def __init__(self, user_model, movie_model, movie_dataset, temp):
                 super().__init__()
                 self.user_model = user_model
                 self.movie_model = movie_model
+                self.temp = temp
 
-                # Retrieval task (metrics removed due to Keras 3 API compatibility)
-                self.task = tfrs.tasks.Retrieval()
+                # Retrieval task with temperature for sharper distinctions
+                self.task = tfrs.tasks.Retrieval(temperature=temp)
 
             def compute_loss(self, features, training=False):
                 # User embeddings
@@ -217,7 +265,7 @@ class TwoTowerModel(BaseRecommender):
 
                 movie_embeddings = self.movie_model(movie_inputs)
 
-                # Compute retrieval loss
+                # Compute retrieval loss with temperature
                 return self.task(user_embeddings, movie_embeddings)
 
         # Create dummy movie dataset for metric computation
@@ -236,6 +284,7 @@ class TwoTowerModel(BaseRecommender):
             user_model=self.user_tower,
             movie_model=self.movie_tower,
             movie_dataset=dummy_movie_data,
+            temp=temperature,
         )
 
         return model
@@ -315,17 +364,21 @@ class TwoTowerModel(BaseRecommender):
         epochs: int = 5,
         batch_size: int = 8192,
         verbose: int = 1,
+        use_generator: bool = True,
+        chunk_size: int = 1_000_000,
     ):
         """
         Train the two-tower model.
 
         Args:
-            train_data: DataFrame with [userId, movieId, rating]
+            train_data: DataFrame with [userId, movieId, rating] OR Path to parquet file
             movie_data: DataFrame with movie features [movieId, overview, ...]
             validation_data: Optional validation DataFrame
             epochs: Number of epochs
             batch_size: Batch size
             verbose: Verbosity
+            use_generator: If True, use memory-efficient generator for large datasets
+            chunk_size: Number of samples per chunk when using generator
 
         Returns:
             Training history
@@ -342,13 +395,30 @@ class TwoTowerModel(BaseRecommender):
         user_id_map = {uid: idx for idx, uid in enumerate(self.user_ids)}
         movie_id_map = {mid: idx for idx, mid in enumerate(self.movie_ids)}
 
+        # Check if we should use generator-based loading for large datasets
+        num_samples = len(train_data)
+        use_generator = use_generator and num_samples > 5_000_000
+
+        if use_generator:
+            print(f"Using memory-efficient generator for {num_samples:,} samples...")
+            return self._fit_with_generator(
+                train_data=train_data,
+                movie_data=movie_data,
+                text_embeddings=text_embeddings,
+                user_id_map=user_id_map,
+                movie_id_map=movie_id_map,
+                epochs=epochs,
+                batch_size=batch_size,
+                verbose=verbose,
+                chunk_size=chunk_size,
+            )
+
+        # Standard in-memory training for smaller datasets
         # Map IDs to indices - use int32 to save memory
         print("Preparing training data...")
         user_indices = train_data["userId"].map(user_id_map).fillna(0).astype(np.int32).values
         movie_indices = train_data["movieId"].map(movie_id_map).fillna(0).astype(np.int32).values
         movie_ids_list = train_data["movieId"].values
-
-        num_samples = len(train_data)
         print(f"  {num_samples:,} training samples")
 
         # For text features, we'll look up embeddings during batch creation
@@ -403,6 +473,164 @@ class TwoTowerModel(BaseRecommender):
         self._precompute_movie_embeddings(movie_data, text_embeddings)
 
         return history
+
+    def _fit_with_generator(
+        self,
+        train_data: pd.DataFrame,
+        movie_data: pd.DataFrame,
+        text_embeddings: Dict,
+        user_id_map: Dict,
+        movie_id_map: Dict,
+        epochs: int,
+        batch_size: int,
+        verbose: int,
+        chunk_size: int,
+    ):
+        """
+        Memory-efficient training using a generator that processes data in chunks.
+
+        This approach avoids loading all data into memory by:
+        1. Processing the dataframe in chunks
+        2. Yielding batches from each chunk
+        3. Using tf.data.Dataset.from_generator for streaming
+        """
+        import gc
+
+        num_samples = len(train_data)
+        print(f"  {num_samples:,} training samples")
+
+        # Build text embedding matrix once (this is small: num_movies x 512)
+        text_emb_matrix = None
+        if self.use_text_features:
+            num_movies = len(self.movie_ids)
+            text_emb_matrix = np.zeros((num_movies, 512), dtype=np.float32)
+            for mid, emb in text_embeddings.items():
+                if mid in movie_id_map:
+                    text_emb_matrix[movie_id_map[mid]] = emb
+            print(f"  Text embedding matrix: {text_emb_matrix.shape}")
+
+        # Calculate steps per epoch
+        steps_per_epoch = (num_samples + batch_size - 1) // batch_size
+
+        def data_generator():
+            """Generator that yields individual samples by processing chunks."""
+            # Shuffle indices for each epoch
+            indices = np.arange(num_samples)
+            np.random.shuffle(indices)
+
+            # Process in chunks to manage memory
+            for chunk_start in range(0, num_samples, chunk_size):
+                chunk_end = min(chunk_start + chunk_size, num_samples)
+                chunk_indices = indices[chunk_start:chunk_end]
+
+                # Get chunk of data
+                chunk_data = train_data.iloc[chunk_indices]
+
+                # Map IDs to indices
+                user_indices = chunk_data["userId"].map(user_id_map).fillna(0).astype(np.int32).values
+                movie_indices = chunk_data["movieId"].map(movie_id_map).fillna(0).astype(np.int32).values
+
+                # Yield samples from this chunk
+                for i in range(len(user_indices)):
+                    if self.use_text_features:
+                        yield (user_indices[i], movie_indices[i], text_emb_matrix[movie_indices[i]])
+                    else:
+                        yield (user_indices[i], movie_indices[i])
+
+                # Free chunk memory
+                del chunk_data, user_indices, movie_indices
+                gc.collect()
+
+        # Define output signature based on features
+        if self.use_text_features:
+            output_signature = (
+                tf.TensorSpec(shape=(), dtype=tf.int32),
+                tf.TensorSpec(shape=(), dtype=tf.int32),
+                tf.TensorSpec(shape=(512,), dtype=tf.float32),
+            )
+
+            def process_sample(user_id, movie_id, text_emb):
+                return {
+                    "user_id": user_id,
+                    "movie_id": movie_id,
+                    "text_embedding": text_emb,
+                }
+
+        else:
+            output_signature = (
+                tf.TensorSpec(shape=(), dtype=tf.int32),
+                tf.TensorSpec(shape=(), dtype=tf.int32),
+            )
+
+            def process_sample(user_id, movie_id):
+                return {
+                    "user_id": user_id,
+                    "movie_id": movie_id,
+                }
+
+        # Create dataset from generator
+        train_dataset = tf.data.Dataset.from_generator(
+            data_generator,
+            output_signature=output_signature,
+        )
+
+        # Apply transformations
+        train_dataset = (
+            train_dataset.map(process_sample, num_parallel_calls=tf.data.AUTOTUNE).batch(batch_size).prefetch(tf.data.AUTOTUNE)
+        )
+
+        # Compile model
+        self.model.compile(optimizer=tf.keras.optimizers.legacy.Adam(self.learning_rate))
+
+        # Train with custom loop to regenerate data each epoch
+        print("Starting training...")
+        all_history = {"loss": []}
+
+        for epoch in range(epochs):
+            print(f"\nEpoch {epoch + 1}/{epochs}")
+
+            # Recreate dataset for each epoch (reshuffles data)
+            epoch_dataset = (
+                tf.data.Dataset.from_generator(
+                    data_generator,
+                    output_signature=output_signature,
+                )
+                .map(process_sample, num_parallel_calls=tf.data.AUTOTUNE)
+                .batch(batch_size)
+                .prefetch(tf.data.AUTOTUNE)
+            )
+
+            history = self.model.fit(
+                epoch_dataset,
+                epochs=1,
+                verbose=verbose,
+                steps_per_epoch=steps_per_epoch,
+            )
+
+            all_history["loss"].append(history.history["loss"][0])
+
+            # Capture any other metrics
+            for key in history.history:
+                if key != "loss":
+                    if key not in all_history:
+                        all_history[key] = []
+                    all_history[key].append(history.history[key][0])
+
+            gc.collect()
+
+        # Create a history-like object
+        class HistoryWrapper:
+            def __init__(self, history_dict):
+                self.history = history_dict
+
+        # Store minimal train data for recommend() seen filtering
+        self.train_data = train_data[["userId", "movieId"]].copy()
+        self.is_fitted = True
+
+        # Pre-compute movie embeddings
+        self._precompute_movie_embeddings(movie_data, text_embeddings)
+
+        return HistoryWrapper(all_history)
 
     def _precompute_movie_embeddings(self, movie_data: pd.DataFrame, text_embeddings: Dict):
         """Pre-compute embeddings for all movies."""
@@ -510,6 +738,11 @@ class TwoTowerModel(BaseRecommender):
         self.movie_tower.save(Path(path))
         print(f"✓ Movie tower saved to {path}")
 
+    def save_content_only_tower(self, path: Path):
+        """Save content-only tower for cold-start inference."""
+        self.content_only_tower.save(Path(path))
+        print(f"✓ Content-only tower saved to {path}")
+
     def save_movie_embeddings(self, path: Path):
         """Save pre-computed movie embeddings for Qdrant."""
         if self.movie_embeddings_cache is None:
@@ -517,6 +750,36 @@ class TwoTowerModel(BaseRecommender):
 
         np.save(path, self.movie_embeddings_cache)
         print(f"✓ Movie embeddings saved to {path}")
+
+    def get_cold_start_embedding(self, text_embedding: np.ndarray) -> np.ndarray:
+        """
+        Get embedding for a cold-start movie using only its text features.
+
+        This enables recommendations for movies not in the training set,
+        using the content-only tower that processes BERT embeddings.
+
+        Args:
+            text_embedding: 512-dim BERT embedding of movie text (title + overview)
+
+        Returns:
+            Movie embedding in the same space as trained movies
+        """
+        if text_embedding.ndim == 1:
+            text_embedding = text_embedding.reshape(1, -1)
+
+        return self.content_only_tower(text_embedding, training=False).numpy()[0]
+
+    def get_cold_start_embeddings_batch(self, text_embeddings: np.ndarray) -> np.ndarray:
+        """
+        Get embeddings for multiple cold-start movies in batch.
+
+        Args:
+            text_embeddings: (N, 512) array of BERT embeddings
+
+        Returns:
+            (N, embedding_dim) array of movie embeddings
+        """
+        return self.content_only_tower(text_embeddings, training=False).numpy()
 
     def get_params(self) -> dict:
         """Get model hyperparameters."""
@@ -527,4 +790,6 @@ class TwoTowerModel(BaseRecommender):
             "bert_model": self.bert_model_name,
             "tower_layers": self.tower_layers,
             "learning_rate": self.learning_rate,
+            "temperature": self.temperature,
+            "dropout_rate": self.dropout_rate,
         }

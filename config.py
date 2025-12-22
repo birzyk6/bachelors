@@ -95,13 +95,16 @@ if TEST_MODE:
     NCF_BATCH_SIZE = 64  # Smaller batches for better gradients
 
     TWO_TOWER_PARAMS = {
-        "embedding_dim": 64,  # Larger embeddings
-        "use_text_features": False,  # Skip BERT for speed
-        "tower_layers": [128, 64],  # Deeper towers
-        "learning_rate": 0.05,  # Lower LR
+        "embedding_dim": 128,  # Larger capacity to prevent collapse
+        "use_text_features": True,  # CRITICAL: Enable content differentiation
+        "tower_layers": [256, 128],  # Deeper towers
+        "learning_rate": 0.0005,  # Much lower LR to prevent embedding collapse
+        "temperature": 0.1,  # Sharper softmax for retrieval loss
+        "dropout_rate": 0.1,  # Less aggressive dropout
     }
-    TWO_TOWER_EPOCHS = 50  # More epochs
-    TWO_TOWER_BATCH_SIZE = 2048  # Smaller batches
+    TWO_TOWER_EPOCHS = 30  # More epochs for convergence
+    TWO_TOWER_BATCH_SIZE = 2048  # Smaller batches for better gradients
+    TWO_TOWER_CHUNK_SIZE = 500_000  # Chunk size for memory-efficient generator training (smaller for test)
 
     CONTENT_BASED_PARAMS = {
         "embedding_model": "https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-512_A-8/2",
@@ -133,13 +136,16 @@ else:
     NCF_BATCH_SIZE = 256
 
     TWO_TOWER_PARAMS = {
-        "embedding_dim": 64,
-        "use_text_features": True,
-        "tower_layers": [128, 64],
-        "learning_rate": 0.1,
+        "embedding_dim": 128,  # Larger capacity to prevent collapse
+        "use_text_features": True,  # Content differentiation
+        "tower_layers": [256, 128],  # Deeper towers
+        "learning_rate": 0.0005,  # Much lower LR to prevent embedding collapse
+        "temperature": 0.1,  # Sharper softmax for retrieval loss
+        "dropout_rate": 0.1,  # Less aggressive dropout
     }
-    TWO_TOWER_EPOCHS = 5
-    TWO_TOWER_BATCH_SIZE = 8192
+    TWO_TOWER_EPOCHS = 20  # More epochs for convergence
+    TWO_TOWER_BATCH_SIZE = 4096  # Smaller batches for better gradients
+    TWO_TOWER_CHUNK_SIZE = 2_000_000  # Chunk size for memory-efficient generator training
 
     CONTENT_BASED_PARAMS = {
         "embedding_model": "https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-512_A-8/2",

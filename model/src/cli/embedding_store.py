@@ -58,8 +58,13 @@ class EmbeddingStore:
 
         self._embedding_dim = metadata["embedding_dim"]
 
-        # Build movie ID list (only those with embeddings)
-        self._movie_ids = [mid for mid in metadata["movie_ids"] if mid in self._embeddings]
+        # Build movie ID list - prefer from embeddings dict (handles combined embeddings)
+        if "movie_ids" in metadata:
+            # Use metadata list (filter to only those with embeddings)
+            self._movie_ids = [mid for mid in metadata["movie_ids"] if mid in self._embeddings]
+        else:
+            # Extract from embeddings dict (for combined embeddings without full ID list)
+            self._movie_ids = list(self._embeddings.keys())
 
         # Build embedding matrix for fast batch operations
         self._embedding_matrix = np.array([self._embeddings[mid] for mid in self._movie_ids])
