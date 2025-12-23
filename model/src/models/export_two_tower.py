@@ -66,6 +66,18 @@ def export_two_tower_model(model: TwoTowerModel, output_dir: Path = None):
     print(f"   ✓ Movie Tower successfully loaded (input: {loaded_movie_tower.input_shape})")
 
     # ========================================================================
+    # 2b. Export Content-Only Tower (for cold-start movies)
+    # ========================================================================
+    print("\n2b. Exporting Content-Only Tower (for cold-start)...")
+    content_tower_path = output_dir / "content_only_tower"
+    model.save_content_only_tower(content_tower_path)
+
+    # Test loading
+    print("   Testing Content-Only Tower loading...")
+    loaded_content_tower = tf.keras.models.load_model(content_tower_path)
+    print(f"   ✓ Content-Only Tower successfully loaded (input: {loaded_content_tower.input_shape})")
+
+    # ========================================================================
     # 3. Export Pre-computed Movie Embeddings
     # ========================================================================
     print("\n3. Exporting movie embeddings for Qdrant...")

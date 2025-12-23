@@ -2,11 +2,12 @@
 Visualization utilities for generating thesis-quality plots.
 
 All plots use consistent academic styling with publication-quality DPI.
+Polish translations are used for academic thesis presentation.
 """
 
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,10 +16,10 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-# Configure matplotlib for LaTeX-style plots
+# Configure matplotlib for LaTeX-style plots with Polish character support
 plt.rcParams.update(
     {
-        "font.family": "serif",
+        "font.family": "DejaVu Sans",  # Supports Polish characters (ą, ę, ć, ł, etc.)
         "font.size": 10,
         "axes.labelsize": 12,
         "axes.titlesize": 14,
@@ -32,6 +33,73 @@ plt.rcParams.update(
     }
 )
 
+# =============================================================================
+# Polish Labels Dictionary - Centralized translations
+# =============================================================================
+POLISH_LABELS = {
+    # Axis labels
+    "model": "Model",
+    "rating": "Ocena",
+    "frequency": "Częstotliwość",
+    "count": "Liczba",
+    "genre": "Gatunek",
+    "movie": "Film",
+    "user": "Użytkownik",
+    "epoch": "Epoka",
+    "loss": "Strata",
+    "similarity": "Podobieństwo",
+    "score": "Wynik",
+    # Metric names
+    "rmse": "RMSE (Pierwiastek błędu średniokwadratowego)",
+    "mae": "MAE (Średni błąd bezwzględny)",
+    "ndcg": "NDCG (Znormalizowany skumulowany zysk)",
+    "recall": "Recall (Pełność)",
+    "precision": "Precision (Precyzja)",
+    "mrr": "MRR (Średnia odwrotność pozycji)",
+    # Plot titles
+    "rating_distribution": "Rozkład ocen w zbiorze danych",
+    "genre_distribution": "Rozkład gatunków filmowych",
+    "rmse_comparison": "Porównanie błędu RMSE między modelami",
+    "ndcg_comparison": "Porównanie jakości rankingu (NDCG@{k})",
+    "recall_comparison": "Porównanie Recall@K między modelami",
+    "precision_comparison": "Porównanie Precision@K między modelami",
+    "learning_curves": "Krzywe uczenia - {model}",
+    "embedding_tsne": "Przestrzeń osadzeń filmów (t-SNE)",
+    "embedding_pca": "Przestrzeń osadzeń filmów (PCA)",
+    "predictions_comparison": "Porównanie predykcji modeli dla użytkownika {user_id}",
+    # Legend labels
+    "mean": "Średnia",
+    "median": "Mediana",
+    "training_loss": "Strata treningowa",
+    "validation_loss": "Strata walidacyjna",
+    "actual_rating": "Rzeczywista ocena",
+    "predicted_rating": "Przewidywana ocena",
+    # Two-Tower specific
+    "embedding_space": "Przestrzeń osadzeń modelu Two-Tower",
+    "similarity_matrix": "Macierz podobieństwa filmów",
+    "recommendations": "Rekomendacje",
+    "affinity_score": "Wynik dopasowania",
+    "cosine_similarity": "Podobieństwo kosinusowe",
+    # Genre names (keep English but can add Polish if needed)
+    "primary_genre": "Główny gatunek",
+    "other": "Inne",
+    # Misc
+    "num_recommendations": "Liczba rekomendacji (K)",
+    "top_n": "Top {n}",
+    "movies": "filmy",
+    "users": "użytkownicy",
+    "ratings": "oceny",
+}
+
+# Model name translations
+MODEL_NAMES_PL = {
+    "collaborative": "Filtrowanie kolaboratywne",
+    "content_based": "Filtrowanie treściowe",
+    "knn": "k-NN",
+    "ncf": "NCF",
+    "two_tower": "Two-Tower",
+}
+
 # Color palette (colorblind-friendly)
 COLORS = sns.color_palette("Set2", 8)
 MODEL_COLORS = {
@@ -41,6 +109,12 @@ MODEL_COLORS = {
     "ncf": COLORS[3],
     "two_tower": COLORS[4],
 }
+
+
+def get_model_name_pl(model_name: str) -> str:
+    """Get Polish model name, or format English name nicely."""
+    key = model_name.lower().replace(" ", "_").replace("-", "_")
+    return MODEL_NAMES_PL.get(key, model_name.replace("_", " ").title())
 
 
 def set_thesis_style():
@@ -65,7 +139,7 @@ def plot_rmse_comparison(results: Dict, output_path: Path):
 
     for model_name, metrics in results["rating_prediction"].items():
         if metrics.get("rmse") is not None:
-            models.append(model_name.replace("_", " ").title())
+            models.append(get_model_name_pl(model_name))
             rmse_values.append(metrics["rmse"])
 
     # Create figure
@@ -74,10 +148,10 @@ def plot_rmse_comparison(results: Dict, output_path: Path):
     x = np.arange(len(models))
     bars = ax.bar(x, rmse_values, color=[MODEL_COLORS.get(m.lower().replace(" ", "_"), COLORS[0]) for m in models])
 
-    # Styling
-    ax.set_xlabel("Model", fontweight="bold")
-    ax.set_ylabel("RMSE (Root Mean Squared Error)", fontweight="bold")
-    ax.set_title("Rating Prediction Performance Comparison", fontweight="bold", pad=20)
+    # Styling with Polish labels
+    ax.set_xlabel(POLISH_LABELS["model"], fontweight="bold")
+    ax.set_ylabel(POLISH_LABELS["rmse"], fontweight="bold")
+    ax.set_title(POLISH_LABELS["rmse_comparison"], fontweight="bold", pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels(models, rotation=45, ha="right")
     ax.set_ylim(0, max(rmse_values) * 1.2)
@@ -122,7 +196,7 @@ def plot_ndcg_comparison(results: Dict, output_path: Path, k: int = 10):
     for model_name, metrics in results["ranking"].items():
         metric_key = f"ndcg@{k}"
         if metric_key in metrics:
-            models.append(model_name.replace("_", " ").title())
+            models.append(get_model_name_pl(model_name))
             ndcg_values.append(metrics[metric_key])
 
     # Create figure
@@ -131,10 +205,10 @@ def plot_ndcg_comparison(results: Dict, output_path: Path, k: int = 10):
     x = np.arange(len(models))
     bars = ax.bar(x, ndcg_values, color=[MODEL_COLORS.get(m.lower().replace(" ", "_"), COLORS[0]) for m in models])
 
-    # Styling
-    ax.set_xlabel("Model", fontweight="bold")
-    ax.set_ylabel(f"NDCG@{k} (Normalized Discounted Cumulative Gain)", fontweight="bold")
-    ax.set_title(f"Ranking Quality Comparison (NDCG@{k})", fontweight="bold", pad=20)
+    # Styling with Polish labels
+    ax.set_xlabel(POLISH_LABELS["model"], fontweight="bold")
+    ax.set_ylabel(f"NDCG@{k}", fontweight="bold")
+    ax.set_title(POLISH_LABELS["ndcg_comparison"].format(k=k), fontweight="bold", pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels(models, rotation=45, ha="right")
     ax.set_ylim(0, 1.0)
@@ -179,16 +253,16 @@ def plot_learning_curves(history, model_name: str, output_path: Path):
     train_loss = history.history["loss"]
     val_loss = history.history.get("val_loss")
 
-    # Plot
-    ax.plot(epochs, train_loss, "o-", label="Training Loss", color=COLORS[0], linewidth=2, markersize=6)
+    # Plot with Polish labels
+    ax.plot(epochs, train_loss, "o-", label=POLISH_LABELS["training_loss"], color=COLORS[0], linewidth=2, markersize=6)
 
     if val_loss:
-        ax.plot(epochs, val_loss, "s-", label="Validation Loss", color=COLORS[1], linewidth=2, markersize=6)
+        ax.plot(epochs, val_loss, "s-", label=POLISH_LABELS["validation_loss"], color=COLORS[1], linewidth=2, markersize=6)
 
-    # Styling
-    ax.set_xlabel("Epoch", fontweight="bold")
-    ax.set_ylabel("Loss", fontweight="bold")
-    ax.set_title(f"{model_name} - Learning Curves", fontweight="bold", pad=20)
+    # Styling with Polish labels
+    ax.set_xlabel(POLISH_LABELS["epoch"], fontweight="bold")
+    ax.set_ylabel(POLISH_LABELS["loss"], fontweight="bold")
+    ax.set_title(POLISH_LABELS["learning_curves"].format(model=get_model_name_pl(model_name)), fontweight="bold", pad=20)
     ax.legend(loc="best", frameon=True, shadow=True)
     ax.grid(alpha=0.3)
 
@@ -223,16 +297,16 @@ def plot_recall_at_k(results: Dict, output_path: Path, k_values: List[int] = Non
             k_values,
             recalls,
             "o-",
-            label=model_name.replace("_", " ").title(),
+            label=get_model_name_pl(model_name),
             color=MODEL_COLORS.get(model_name, COLORS[0]),
             linewidth=2,
             markersize=8,
         )
 
-    # Styling
-    ax.set_xlabel("K (Number of Recommendations)", fontweight="bold")
+    # Styling with Polish labels
+    ax.set_xlabel(POLISH_LABELS["num_recommendations"], fontweight="bold")
     ax.set_ylabel("Recall@K", fontweight="bold")
-    ax.set_title("Recall@K Comparison Across Models", fontweight="bold", pad=20)
+    ax.set_title(POLISH_LABELS["recall_comparison"], fontweight="bold", pad=20)
     ax.set_xticks(k_values)
     ax.set_ylim(0, 1.0)
     ax.legend(loc="best", frameon=True, shadow=True)
@@ -249,7 +323,7 @@ def plot_embedding_tsne(
     embeddings: np.ndarray,
     labels: List[str],
     output_path: Path,
-    title: str = "Movie Embeddings (t-SNE)",
+    title: str = None,
     perplexity: int = 30,
 ):
     """
@@ -259,10 +333,13 @@ def plot_embedding_tsne(
         embeddings: Array of shape (n_samples, embedding_dim)
         labels: List of labels for coloring (e.g., genres)
         output_path: Path to save figure
-        title: Plot title
+        title: Plot title (defaults to Polish)
         perplexity: t-SNE perplexity parameter
     """
     set_thesis_style()
+
+    if title is None:
+        title = POLISH_LABELS["embedding_tsne"]
 
     print(f"Computing t-SNE projection (perplexity={perplexity})...")
 
@@ -289,11 +366,11 @@ def plot_embedding_tsne(
             s=30,
         )
 
-    # Styling
-    ax.set_xlabel("t-SNE Dimension 1", fontweight="bold")
-    ax.set_ylabel("t-SNE Dimension 2", fontweight="bold")
+    # Styling with Polish labels
+    ax.set_xlabel("t-SNE wymiar 1", fontweight="bold")
+    ax.set_ylabel("t-SNE wymiar 2", fontweight="bold")
     ax.set_title(title, fontweight="bold", pad=20)
-    ax.legend(loc="best", frameon=True, shadow=True, ncol=2)
+    ax.legend(loc="best", frameon=True, shadow=True, ncol=2, title=POLISH_LABELS["primary_genre"])
     ax.grid(alpha=0.2)
 
     plt.tight_layout()
@@ -307,7 +384,7 @@ def plot_embedding_pca(
     embeddings: np.ndarray,
     labels: List[str],
     output_path: Path,
-    title: str = "Movie Embeddings (PCA)",
+    title: str = None,
 ):
     """
     Create PCA visualization of embeddings.
@@ -316,9 +393,12 @@ def plot_embedding_pca(
         embeddings: Array of shape (n_samples, embedding_dim)
         labels: List of labels for coloring
         output_path: Path to save figure
-        title: Plot title
+        title: Plot title (defaults to Polish)
     """
     set_thesis_style()
+
+    if title is None:
+        title = POLISH_LABELS["embedding_pca"]
 
     print("Computing PCA projection...")
 
@@ -348,11 +428,11 @@ def plot_embedding_pca(
             s=30,
         )
 
-    # Styling
-    ax.set_xlabel(f"PC1 ({explained_var[0]:.1%} variance)", fontweight="bold")
-    ax.set_ylabel(f"PC2 ({explained_var[1]:.1%} variance)", fontweight="bold")
+    # Styling with Polish labels
+    ax.set_xlabel(f"PC1 ({explained_var[0]:.1%} wariancji)", fontweight="bold")
+    ax.set_ylabel(f"PC2 ({explained_var[1]:.1%} wariancji)", fontweight="bold")
     ax.set_title(title, fontweight="bold", pad=20)
-    ax.legend(loc="best", frameon=True, shadow=True, ncol=2)
+    ax.legend(loc="best", frameon=True, shadow=True, ncol=2, title=POLISH_LABELS["primary_genre"])
     ax.grid(alpha=0.2)
 
     plt.tight_layout()
@@ -381,14 +461,16 @@ def plot_rating_distribution(ratings: pd.Series, output_path: Path):
     mean_rating = ratings.mean()
     median_rating = ratings.median()
 
-    # Add vertical lines for mean and median
-    ax.axvline(mean_rating, color="red", linestyle="--", linewidth=2, label=f"Mean: {mean_rating:.2f}")
-    ax.axvline(median_rating, color="orange", linestyle="--", linewidth=2, label=f"Median: {median_rating:.2f}")
+    # Add vertical lines for mean and median with Polish labels
+    ax.axvline(mean_rating, color="red", linestyle="--", linewidth=2, label=f"{POLISH_LABELS['mean']}: {mean_rating:.2f}")
+    ax.axvline(
+        median_rating, color="orange", linestyle="--", linewidth=2, label=f"{POLISH_LABELS['median']}: {median_rating:.2f}"
+    )
 
-    # Styling
-    ax.set_xlabel("Rating", fontweight="bold")
-    ax.set_ylabel("Frequency", fontweight="bold")
-    ax.set_title("Rating Distribution in Dataset", fontweight="bold", pad=20)
+    # Styling with Polish labels
+    ax.set_xlabel(POLISH_LABELS["rating"], fontweight="bold")
+    ax.set_ylabel(POLISH_LABELS["frequency"], fontweight="bold")
+    ax.set_title(POLISH_LABELS["rating_distribution"], fontweight="bold", pad=20)
     ax.legend(loc="best", frameon=True, shadow=True)
     ax.grid(axis="y", alpha=0.3)
 
@@ -424,10 +506,10 @@ def plot_genre_distribution(genres: pd.Series, output_path: Path, top_n: int = 1
     x = np.arange(len(genre_counts))
     bars = ax.bar(x, genre_counts.values, color=COLORS[0], edgecolor="black", alpha=0.7)
 
-    # Styling
-    ax.set_xlabel("Genre", fontweight="bold")
-    ax.set_ylabel("Frequency", fontweight="bold")
-    ax.set_title(f"Top {top_n} Genre Distribution", fontweight="bold", pad=20)
+    # Styling with Polish labels
+    ax.set_xlabel(POLISH_LABELS["genre"], fontweight="bold")
+    ax.set_ylabel(POLISH_LABELS["frequency"], fontweight="bold")
+    ax.set_title(POLISH_LABELS["genre_distribution"], fontweight="bold", pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels(genre_counts.index, rotation=45, ha="right")
     ax.grid(axis="y", alpha=0.3)
@@ -514,13 +596,13 @@ def plot_model_predictions_comparison(
             x + offset,
             predictions,
             width,
-            label=model_name.replace("_", " ").title(),
+            label=get_model_name_pl(model_name),
             color=color,
             edgecolor="black",
             alpha=0.8,
         )
 
-    # Add actual ratings if available
+    # Add actual ratings if available with Polish label
     if actual_ratings:
         actual_values = [actual_ratings.get(df[df["movie_title"] == movie]["movie_id"].values[0], None) for movie in movies]
         if any(v is not None for v in actual_values):
@@ -528,12 +610,21 @@ def plot_model_predictions_comparison(
             valid_actual = [(i, v) for i, v in enumerate(actual_values) if v is not None]
             if valid_actual:
                 indices, values = zip(*valid_actual)
-                ax.plot(indices, values, "r--", linewidth=2, marker="o", markersize=8, label="Actual Rating", zorder=10)
+                ax.plot(
+                    indices,
+                    values,
+                    "r--",
+                    linewidth=2,
+                    marker="o",
+                    markersize=8,
+                    label=POLISH_LABELS["actual_rating"],
+                    zorder=10,
+                )
 
-    # Styling
-    ax.set_xlabel("Movie", fontweight="bold")
-    ax.set_ylabel("Rating", fontweight="bold")
-    ax.set_title(f"Model Predictions Comparison for User {user_id}", fontweight="bold", pad=20)
+    # Styling with Polish labels
+    ax.set_xlabel(POLISH_LABELS["movie"], fontweight="bold")
+    ax.set_ylabel(POLISH_LABELS["rating"], fontweight="bold")
+    ax.set_title(POLISH_LABELS["predictions_comparison"].format(user_id=user_id), fontweight="bold", pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels([title[:30] + "..." if len(title) > 30 else title for title in movies], rotation=45, ha="right")
     ax.set_ylim(0, 5.5)

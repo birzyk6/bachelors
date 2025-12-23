@@ -1,0 +1,9 @@
+{
+  "num_movies": 1337318,
+  "num_with_overview": 1035614,
+  "num_with_genres": 762634,
+  "year_min": 1800,
+  "year_max": 2099,
+  "popularity_mean": 1.0722335895746984,
+  "vote_average_mean": 1.6352211306510496
+}

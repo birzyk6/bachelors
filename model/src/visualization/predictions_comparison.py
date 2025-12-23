@@ -406,10 +406,10 @@ def plot_model_predictions_comparison(
     )
 
     # Styling
-    ax.set_xlabel("Rating", fontweight="bold", fontsize=12)
-    ax.set_ylabel("Movie", fontweight="bold", fontsize=12)
+    ax.set_xlabel("Ocena", fontweight="bold", fontsize=12)
+    ax.set_ylabel("Film", fontweight="bold", fontsize=12)
     ax.set_title(
-        f"Model Predictions Comparison for User {sample_user_id}", fontweight="bold", pad=25, fontsize=20, loc="center"
+        f"Porównanie Predykcji Modeli dla Użytkownika {sample_user_id}", fontweight="bold", pad=25, fontsize=20, loc="center"
     )
 
     # Set y-ticks to movie names
@@ -436,7 +436,7 @@ def plot_model_predictions_comparison(
             [0],
             marker="*",
             color="w",
-            label="Actual Rating",
+            label="Rzeczywista Ocena",
             markerfacecolor="blue",
             markersize=15,
             markeredgecolor="black",
@@ -465,7 +465,7 @@ def plot_model_predictions_comparison(
             [0],
             marker="o",
             color="w",
-            label="Low Error (Good)",
+            label="Niski Błąd (Dobry)",
             markerfacecolor="lime",
             markersize=10,
             markeredgecolor="black",
@@ -477,7 +477,7 @@ def plot_model_predictions_comparison(
             [0],
             marker="o",
             color="w",
-            label="High Error (Bad)",
+            label="Wysoki Błąd (Zły)",
             markerfacecolor="red",
             markersize=10,
             markeredgecolor="black",
@@ -491,7 +491,7 @@ def plot_model_predictions_comparison(
             [0],
             marker="o",
             color="w",
-            label="Best Model",
+            label="Najlepszy Model",
             markerfacecolor="white",
             markersize=14,
             markeredgecolor="black",
@@ -517,7 +517,7 @@ def plot_model_predictions_comparison(
     # Adjust layout to make room for legend at bottom
     plt.subplots_adjust(bottom=0.22)
 
-    output_path = output_dir / "model_predictions_comparison.png"
+    output_path = output_dir / "models" / "porownanie_predykcji_modeli.png"
     plt.savefig(output_path)
     plt.close()
 

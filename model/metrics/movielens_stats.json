@@ -1,0 +1,14 @@
+{
+  "num_movies": 87585,
+  "num_users": 200948,
+  "num_ratings": 32000204,
+  "train_ratings": 25604307,
+  "val_ratings": 3198642,
+  "test_ratings": 3197255,
+  "rating_min": 0.5,
+  "rating_max": 5.0,
+  "rating_mean": 3.5403757266306797,
+  "rating_std": 1.0590418566831439,
+  "movies_with_tmdb": 87461,
+  "movies_without_tmdb": 124
+}

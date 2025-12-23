@@ -1,0 +1,11 @@
+{
+  "num_movies": 87585,
+  "num_users": 200948,
+  "num_ratings": 32000204,
+  "coverage_tmdb_metadata": 99.85842324598961,
+  "preprocessing": {
+    "train_ratio": 0.8001294929244827,
+    "val_ratio": 0.09995692527460137,
+    "test_ratio": 0.09991358180091602
+  }
+}
