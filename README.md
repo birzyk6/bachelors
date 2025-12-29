@@ -2,7 +2,7 @@
 
 **Comparative Study of Recommendation Algorithms with Production-Ready Two-Tower Model**
 
-Author: Bartek | Date: December 2024
+Author: Bartek | Date: December 2025
 
 ---
 
