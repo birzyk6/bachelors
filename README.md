@@ -1,9 +1,6 @@
 # Bachelor's Thesis: Recommendation Systems
 
 **Comparative Study of Recommendation Algorithms with Production-Ready Two-Tower Model**
-
-Author: Bartek | Date: December 2025
-
 ---
 
 ## 🎯 Project Overview
