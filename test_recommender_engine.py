@@ -19,13 +19,11 @@ import pandas as pd
 import polars as pl
 import seaborn as sns
 
-# Add project root to path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from model.src.visualization.plots import COLORS, set_thesis_style
 
-# Polish labels for recommender plots
 RECOMMENDER_LABELS = {
     "search_results": "Wyniki wyszukiwania dla zapytań",
     "similar_movies": "Rekomendacje podobnych filmów",
@@ -43,23 +41,20 @@ RECOMMENDER_LABELS = {
 
 
 def load_recommender_engine():
-    """Load the recommendation engine."""
     from model.src.cli.embedding_store import EmbeddingStore
     from model.src.cli.engine import RecommendationEngine
     from model.src.cli.movie_catalog import MovieCatalog
 
-    # Paths
     data_dir = PROJECT_ROOT / "model" / "data" / "processed"
     models_dir = PROJECT_ROOT / "model" / "saved_models"
 
-    # Load components
     print("  Ładowanie katalogu filmów...")
     catalog = MovieCatalog(data_dir / "movies.parquet")
-    catalog.load()  # Explicit load
+    catalog.load()
 
     print("  Ładowanie osadzeń...")
     embeddings = EmbeddingStore(models_dir / "movie_embeddings.npy", models_dir / "movie_embeddings_metadata.json")
-    embeddings.load()  # Explicit load
+    embeddings.load()
 
     print("  Inicjalizacja silnika rekomendacji...")
     engine = RecommendationEngine(embeddings, catalog)
@@ -68,14 +63,10 @@ def load_recommender_engine():
 
 
 def test_search_queries(engine, output_path: Path):
-    """
-    Test various search queries and visualize results.
-    """
     set_thesis_style()
 
     print("\n  Testowanie zapytań wyszukiwania...")
 
-    # Test queries with different types
     test_queries = [
         ("Matrix", "Tytuł"),
         ("action sci-fi", "Gatunek"),
@@ -94,7 +85,6 @@ def test_search_queries(engine, output_path: Path):
             ax.set_title(f'Zapytanie: "{query}" ({query_type})')
             continue
 
-        # Extract data
         titles = []
         scores = []
         genres = []
@@ -106,7 +96,6 @@ def test_search_queries(engine, output_path: Path):
             scores.append(score)
             genres.append(str(genre)[:20] if genre else "")
 
-        # Plot
         y_pos = np.arange(len(titles))
         colors = plt.cm.viridis(np.linspace(0.3, 0.9, len(titles)))
         bars = ax.barh(y_pos, scores, color=colors)
@@ -117,7 +106,6 @@ def test_search_queries(engine, output_path: Path):
         ax.set_xlabel(RECOMMENDER_LABELS["similarity_score"], fontweight="bold")
         ax.set_title(f'Zapytanie: "{query}" ({query_type})\n{explanation}', fontsize=10, fontweight="bold")
 
-        # Add score labels
         for bar, score in zip(bars, scores):
             ax.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height() / 2, f"{score:.3f}", va="center", fontsize=7)
 
@@ -130,21 +118,16 @@ def test_search_queries(engine, output_path: Path):
 
 
 def test_similar_movies(engine, output_path: Path):
-    """
-    Test similar movie recommendations for popular movies.
-    """
     set_thesis_style()
 
     print("\n  Testowanie rekomendacji podobnych filmów...")
 
-    # Popular movies to find similar ones for
     query_titles = ["Matrix", "Toy Story", "Titanic", "Star Wars"]
 
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
     axes = axes.flatten()
 
     for ax, query_title in zip(axes, query_titles):
-        # Find the movie
         movie_ids = engine.catalog.search_by_title(query_title, limit=1)
 
         if not movie_ids:
@@ -154,14 +137,12 @@ def test_similar_movies(engine, output_path: Path):
         query_id = movie_ids[0]
         full_title = engine.catalog.get_title(query_id)
 
-        # Get similar movies using the correct method
         similar = engine.recommend_similar_to_movie(query_id, top_k=10)
 
         if not similar:
             ax.text(0.5, 0.5, f"Brak podobnych dla: {full_title}", ha="center", va="center")
             continue
 
-        # Extract data - format is (movie_id, score, info)
         titles = []
         scores = []
         genres = []
@@ -173,7 +154,6 @@ def test_similar_movies(engine, output_path: Path):
             scores.append(score)
             genres.append(str(genre)[:18] if genre else "")
 
-        # Plot
         y_pos = np.arange(len(titles))
         colors = plt.cm.Blues(np.linspace(0.4, 0.9, len(titles)))
         bars = ax.barh(y_pos, scores, color=colors)
@@ -184,7 +164,6 @@ def test_similar_movies(engine, output_path: Path):
         ax.set_xlabel(RECOMMENDER_LABELS["similarity_score"], fontweight="bold")
         ax.set_title(f"Podobne do: {str(full_title)[:35]}", fontsize=10, fontweight="bold")
 
-        # Add score labels
         for bar, score in zip(bars, scores):
             ax.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height() / 2, f"{score:.3f}", va="center", fontsize=7)
 
@@ -197,14 +176,10 @@ def test_similar_movies(engine, output_path: Path):
 
 
 def test_genre_recommendations(engine, output_path: Path):
-    """
-    Test genre-based recommendations.
-    """
     set_thesis_style()
 
     print("\n  Testowanie rekomendacji według gatunku...")
 
-    # Test different genres
     test_genres = [
         ["Action", "Sci-Fi"],
         ["Comedy", "Romance"],
@@ -216,14 +191,12 @@ def test_genre_recommendations(engine, output_path: Path):
     axes = axes.flatten()
 
     for ax, genres in zip(axes, test_genres):
-        # Get genre recommendations using the correct method
         results = engine.recommend_by_genres(genres, top_k=10)
 
         if not results:
             ax.text(0.5, 0.5, f"Brak wyników dla: {', '.join(genres)}", ha="center", va="center")
             continue
 
-        # Extract data - format is (movie_id, score, info)
         titles = []
         scores = []
         movie_genres = []
@@ -235,7 +208,6 @@ def test_genre_recommendations(engine, output_path: Path):
             scores.append(score)
             movie_genres.append(str(genre)[:18] if genre else "")
 
-        # Plot
         y_pos = np.arange(len(titles))
         colors = plt.cm.Greens(np.linspace(0.4, 0.9, len(titles)))
         bars = ax.barh(y_pos, scores, color=colors)
@@ -246,7 +218,6 @@ def test_genre_recommendations(engine, output_path: Path):
         ax.set_xlabel(RECOMMENDER_LABELS["similarity_score"], fontweight="bold")
         ax.set_title(f'Gatunek: {", ".join(genres)}', fontsize=10, fontweight="bold")
 
-        # Add score labels
         for bar, score in zip(bars, scores):
             ax.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height() / 2, f"{score:.3f}", va="center", fontsize=7)
 
@@ -259,14 +230,10 @@ def test_genre_recommendations(engine, output_path: Path):
 
 
 def test_user_profiles(engine, output_path: Path):
-    """
-    Test user profile-based recommendations.
-    """
     set_thesis_style()
 
     print("\n  Testowanie profili użytkowników...")
 
-    # Create sample user profiles based on movie preferences
     sample_profiles = [
         {
             "name": "Fan science fiction",
@@ -290,7 +257,6 @@ def test_user_profiles(engine, output_path: Path):
     axes = axes.flatten()
 
     for ax, profile in zip(axes, sample_profiles):
-        # Find movie IDs for liked movies
         liked_ids = []
         liked_titles = []
         for movie_title in profile["liked_movies"]:
@@ -303,14 +269,12 @@ def test_user_profiles(engine, output_path: Path):
             ax.text(0.5, 0.5, f"Za mało filmów dla profilu: {profile['name']}", ha="center", va="center")
             continue
 
-        # Get recommendations based on profile using correct method
         results = engine.recommend_similar_to_movies(liked_ids, top_k=8)
 
         if not results:
             ax.text(0.5, 0.5, f"Brak rekomendacji dla: {profile['name']}", ha="center", va="center")
             continue
 
-        # Extract data - format is (movie_id, score, info)
         titles = []
         scores = []
         genres = []
@@ -322,7 +286,6 @@ def test_user_profiles(engine, output_path: Path):
             scores.append(score)
             genres.append(str(genre)[:18] if genre else "")
 
-        # Plot
         y_pos = np.arange(len(titles))
         colors = plt.cm.Oranges(np.linspace(0.4, 0.9, len(titles)))
         bars = ax.barh(y_pos, scores, color=colors)
@@ -332,11 +295,9 @@ def test_user_profiles(engine, output_path: Path):
         ax.invert_yaxis()
         ax.set_xlabel(RECOMMENDER_LABELS["similarity_score"], fontweight="bold")
 
-        # Create subtitle with liked movies
         liked_str = ", ".join([str(t)[:15] for t in liked_titles[:2]])
         ax.set_title(f'{profile["name"]}\nLubi: {liked_str}...', fontsize=10, fontweight="bold")
 
-        # Add score labels
         for bar, score in zip(bars, scores):
             ax.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height() / 2, f"{score:.3f}", va="center", fontsize=7)
 
@@ -349,14 +310,10 @@ def test_user_profiles(engine, output_path: Path):
 
 
 def test_method_comparison(engine, output_path: Path):
-    """
-    Compare different recommendation methods for the same query.
-    """
     set_thesis_style()
 
     print("\n  Porównanie metod rekomendacji...")
 
-    # Test movie
     test_movie = "Matrix"
     movie_ids = engine.catalog.search_by_title(test_movie, limit=1)
 
@@ -368,28 +325,21 @@ def test_method_comparison(engine, output_path: Path):
     full_title = engine.catalog.get_title(query_id)
     query_genres = engine.catalog.get_genres(query_id)
 
-    # Get recommendations from different methods
     methods_results = {}
 
-    # 1. Similar movies (embedding similarity)
     similar = engine.recommend_similar_to_movie(query_id, top_k=5)
-    # Convert to (movie_id, score) tuples
     methods_results["Podobieństwo\nosadzeń"] = [(mid, score) for mid, score, _ in similar]
 
-    # 2. Genre-based
     if query_genres:
         genre_list = query_genres.split(",") if "," in query_genres else query_genres.split("|")
         genre_list = [g.strip() for g in genre_list[:2]]
         genre_results = engine.recommend_by_genres(genre_list, top_k=5)
         methods_results["Według\ngatunku"] = [(mid, score) for mid, score, _ in genre_results]
 
-    # 3. Smart search
     search_results, _ = engine.smart_search(test_movie, top_k=5)
-    # Convert to same format - smart_search returns (mid, score, info)
-    search_formatted = [(mid, abs(score)) for mid, score, _ in search_results]  # abs() because some may be negative
+    search_formatted = [(mid, abs(score)) for mid, score, _ in search_results]
     methods_results["Inteligentne\nwyszukiwanie"] = search_formatted
 
-    # Create comparison plot
     fig, ax = plt.subplots(figsize=(14, 8))
 
     n_methods = len(methods_results)
@@ -407,9 +357,8 @@ def test_method_comparison(engine, output_path: Path):
         for movie_id, score in results[:n_movies]:
             title = engine.catalog.get_title(movie_id)
             titles.append(str(title)[:20] if title else f"Film {movie_id}")
-            scores.append(score if score > 0 else 0.5)  # Default for title matches
+            scores.append(score if score > 0 else 0.5)
 
-        # Pad if needed
         while len(scores) < n_movies:
             titles.append("")
             scores.append(0)
@@ -433,21 +382,13 @@ def test_method_comparison(engine, output_path: Path):
 
 
 def generate_all_recommender_tests(output_dir: Path):
-    """
-    Run all recommender engine tests and generate plots.
-
-    Args:
-        output_dir: Path to save plots
-    """
     print("\n" + "=" * 80)
     print("Testowanie silnika rekomendacji")
     print("=" * 80)
 
-    # Create output directory
     rec_dir = output_dir / "recommender"
     rec_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load engine
     print("\nŁadowanie silnika rekomendacji...")
     try:
         engine, catalog = load_recommender_engine()
@@ -457,22 +398,16 @@ def generate_all_recommender_tests(output_dir: Path):
 
     print(f"  Załadowano {catalog.num_movies:,} filmów")
 
-    # Run tests
     print("\nUruchamianie testów...")
 
-    # 1. Search queries
     test_search_queries(engine, rec_dir / "wyniki_wyszukiwania.png")
 
-    # 2. Similar movies
     test_similar_movies(engine, rec_dir / "podobne_filmy.png")
 
-    # 3. Genre recommendations
     test_genre_recommendations(engine, rec_dir / "rekomendacje_gatunkowe.png")
 
-    # 4. User profiles
     test_user_profiles(engine, rec_dir / "profile_uzytkownikow.png")
 
-    # 5. Method comparison
     test_method_comparison(engine, rec_dir / "porownanie_metod.png")
 
     print("\n" + "=" * 80)

@@ -14,7 +14,6 @@ import seaborn as sns
 
 from ..models import CollaborativeFilteringModel, ContentBasedModel, KNNModel, NeuralCollaborativeFiltering
 
-# Configure plot style
 plt.rcParams.update(
     {
         "font.family": "serif",
@@ -61,16 +60,13 @@ def load_model_predictions(
         return None
 
     try:
-        # Initialize model
         if init_args:
             model = model_class(**init_args)
         else:
             model = model_class()
 
-        # Load saved model
         model.load(model_path)
 
-        # Generate predictions
         pred_input = pd.DataFrame({"userId": [sample_user_id] * len(movie_ids), "movieId": movie_ids})
         preds = model.predict(pred_input)
         return dict(zip(movie_ids, preds))
@@ -91,12 +87,10 @@ def load_sample_predictions(
         with open(results_file) as f:
             results = json.load(f)
 
-        # Check if sample predictions exist
         if "sample_predictions" in results:
             sample_preds = results["sample_predictions"]
             if str(sample_user_id) in sample_preds:
                 user_preds = sample_preds[str(sample_user_id)]
-                # Extract predictions for our movies
                 preds = {}
                 for movie_id in movie_ids:
                     for pred in user_preds:
@@ -116,19 +110,16 @@ def generate_baseline_predictions(
     """Generate simple baseline predictions when models aren't available."""
     predictions = {}
 
-    # User average baseline
     user_ratings = train_data[train_data["userId"] == sample_user_id]["rating"]
     if len(user_ratings) > 0:
         user_avg = user_ratings.mean()
     else:
-        user_avg = 3.5  # Global average
+        user_avg = 3.5
 
-    # Movie average baseline
     for movie_id in movie_ids:
         movie_ratings = train_data[train_data["movieId"] == movie_id]["rating"]
         if len(movie_ratings) > 0:
             movie_avg = movie_ratings.mean()
-            # Blend user and movie average
             predictions[movie_id] = (user_avg + movie_avg) / 2
         else:
             predictions[movie_id] = user_avg
@@ -162,79 +153,59 @@ def plot_model_predictions_comparison(
     print("Model Predictions Comparison (Saved Models)")
     print("=" * 80)
 
-    # Create plots directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load data
     print("\nLoading data...")
     test_data = pl.read_parquet(data_dir / "test.parquet").to_pandas()
     train_data = pl.read_parquet(data_dir / "train.parquet").to_pandas()
     movies_data = pl.read_parquet(data_dir / "movies.parquet").to_pandas()
 
-    # Create movie title mapping
     movie_titles = dict(zip(movies_data["movieId"], movies_data["title_ml"]))
 
-    # Find a user with enough popular movie ratings
     if "popularity" in test_data.columns:
-        # Filter for popular movies (top 50% of popularity in the dataset)
         popularity_threshold = test_data["popularity"].quantile(0.5)
         popular_test_data = test_data[test_data["popularity"] >= popularity_threshold].copy()
 
-        # Find users with at least num_movies popular ratings
         user_popular_counts = popular_test_data.groupby("userId").size()
         users_with_enough = user_popular_counts[user_popular_counts >= num_movies]
 
         if len(users_with_enough) > 0:
-            # Try to use the specified user if they have enough popular movies
             if sample_user_id in users_with_enough.index:
                 user_test_ratings = popular_test_data[popular_test_data["userId"] == sample_user_id].copy()
             else:
-                # Otherwise use the user with most popular movie ratings
                 sample_user_id = user_popular_counts.idxmax()
                 user_test_ratings = popular_test_data[popular_test_data["userId"] == sample_user_id].copy()
         else:
-            # Fallback if no user has enough popular ratings
             user_test_ratings = test_data[test_data["userId"] == sample_user_id].copy()
     else:
-        # No popularity column, use any user
         user_test_ratings = test_data[test_data["userId"] == sample_user_id].copy()
 
-    # Ensure we have data for the selected user
     if len(user_test_ratings) == 0:
         sample_user_id = test_data["userId"].iloc[0]
         user_test_ratings = test_data[test_data["userId"] == sample_user_id].copy()
 
-    # Try to get diverse ratings by sorting and sampling across rating range
     if len(user_test_ratings) >= num_movies:
-        # Sort by rating to ensure diversity
         sorted_ratings = user_test_ratings.sort_values("rating")
 
-        # For each rating bucket, select the most popular movie
-        # This gives us diverse ratings but with popular films
         rating_bins = pd.cut(sorted_ratings["rating"], bins=num_movies, duplicates="drop")
 
         if "popularity" in sorted_ratings.columns:
-            # Select most popular movie from each rating bin
             selected = []
             for bin_label in rating_bins.cat.categories:
                 bin_movies = sorted_ratings[rating_bins == bin_label]
                 if len(bin_movies) > 0:
-                    # Get the most popular movie in this rating range
                     most_popular = bin_movies.nlargest(1, "popularity")
                     selected.append(most_popular)
 
             if len(selected) >= num_movies:
                 user_test_ratings = pd.concat(selected).head(num_movies)
             else:
-                # Fallback to simple sampling if not enough
                 indices = np.linspace(0, len(sorted_ratings) - 1, num_movies, dtype=int)
                 user_test_ratings = sorted_ratings.iloc[indices]
         else:
-            # No popularity column, use simple sampling
             indices = np.linspace(0, len(sorted_ratings) - 1, num_movies, dtype=int)
             user_test_ratings = sorted_ratings.iloc[indices]
     else:
-        # If not enough ratings, take what we have
         user_test_ratings = user_test_ratings.head(num_movies)
 
     print(f"  Selected user: {sample_user_id}")
@@ -244,12 +215,10 @@ def plot_model_predictions_comparison(
     movie_ids = user_test_ratings["movieId"].tolist()
     actual_ratings = dict(zip(user_test_ratings["movieId"], user_test_ratings["rating"]))
 
-    # Load predictions from saved models
     predictions = {}
 
     print("\nLoading models and generating predictions...")
 
-    # Collaborative Filtering
     print("  Loading Collaborative Filtering...")
     cf_path = saved_models_dir / "collaborative_model"
     cf_preds = load_model_predictions("Collaborative", CollaborativeFilteringModel, cf_path, sample_user_id, movie_ids)
@@ -257,7 +226,6 @@ def plot_model_predictions_comparison(
         predictions["Collaborative"] = cf_preds
         print("    ✓ Collaborative predictions loaded")
 
-    # Content-Based
     print("  Loading Content-Based...")
     cb_path = saved_models_dir / "content_based_model"
     cb_preds = load_model_predictions("Content-Based", ContentBasedModel, cb_path, sample_user_id, movie_ids)
@@ -265,7 +233,6 @@ def plot_model_predictions_comparison(
         predictions["Content-Based"] = cb_preds
         print("    ✓ Content-Based predictions loaded")
 
-    # KNN
     print("  Loading KNN...")
     knn_path = saved_models_dir / "knn_model"
     knn_preds = load_model_predictions("KNN", KNNModel, knn_path, sample_user_id, movie_ids)
@@ -273,12 +240,10 @@ def plot_model_predictions_comparison(
         predictions["KNN"] = knn_preds
         print("    ✓ KNN predictions loaded")
 
-    # NCF
     print("  Loading NCF...")
     ncf_path = saved_models_dir / "ncf_model"
     if ncf_path.exists():
         try:
-            # Load mappings to get num_users and num_movies
             with open(ncf_path / "mappings.json") as f:
                 mappings = json.load(f)
             num_users = len(mappings["user_id_map"])
@@ -302,47 +267,37 @@ def plot_model_predictions_comparison(
         print("\n✗ No predictions available. Please train models first.")
         raise ValueError("No model predictions available")
 
-    # Create plot
     print("\nGenerating plot...")
-    fig, ax = plt.subplots(figsize=(12, 10))  # Taller for horizontal layout
+    fig, ax = plt.subplots(figsize=(12, 10))
 
-    # Prepare data
     movie_labels = [movie_titles.get(mid, f"Movie {mid}") for mid in movie_ids]
 
     y = np.arange(len(movie_ids))
 
-    # Add alternating background colors for readability
     for i in range(len(movie_ids)):
         if i % 2 == 0:
             ax.axhspan(i - 0.5, i + 0.5, color="#eeeeee", alpha=0.5, zorder=0)
 
-    # Define color gradient based on error (Green=Close, Red=Far)
     def get_error_color(predicted, actual):
         """Get color based on absolute error."""
         error = abs(predicted - actual)
-        # Cap error at 2.0 for color scaling
         max_error = 2.0
         normalized = min(error / max_error, 1.0)
 
-        # Create gradient: Green (good) -> Yellow -> Red (bad)
         if normalized < 0.5:
-            # Green to Yellow
             r = normalized * 2
             g = 1.0
             b = 0.0
         else:
-            # Yellow to Red
             r = 1.0
             g = 1.0 - (normalized - 0.5) * 2
             b = 0.0
         return (r, g, b)
 
-    # Plot scatter points for each model with vertical stagger
     model_names = list(predictions.keys())
     stagger_width = 0.3
     stagger_step = stagger_width / (len(model_names) - 1) if len(model_names) > 1 else 0
 
-    # Identify best model for each movie
     best_model_per_movie = []
     for mid in movie_ids:
         actual = actual_ratings[mid]
@@ -352,13 +307,11 @@ def plot_model_predictions_comparison(
 
     for i, model_name in enumerate(model_names):
         preds = [predictions[model_name].get(mid, 3.0) for mid in movie_ids]
-        # Calculate stagger offset (centered around 0)
         offset = -stagger_width / 2 + i * stagger_step
         y_offset = y + offset
 
         marker = MODEL_MARKERS.get(model_name, "o")
 
-        # Color each point based on error from actual rating
         colors = []
         sizes = []
         linewidths = []
@@ -368,17 +321,15 @@ def plot_model_predictions_comparison(
             actual = actual_ratings[mid]
             colors.append(get_error_color(pred, actual))
 
-            # Highlight best model
             if model_name == best_model_per_movie[j]:
-                sizes.append(280)  # Larger
-                linewidths.append(2.5)  # Thicker border
+                sizes.append(280)
+                linewidths.append(2.5)
                 edgecolors.append("black")
             else:
                 sizes.append(180)
                 linewidths.append(1.0)
                 edgecolors.append("black")
 
-        # Plot points only (no connecting lines)
         ax.scatter(
             preds,
             y_offset,
@@ -391,7 +342,6 @@ def plot_model_predictions_comparison(
             zorder=5,
         )
 
-    # Add actual ratings as scatter points only (no line)
     actual_values = [actual_ratings[mid] for mid in movie_ids]
     ax.scatter(
         actual_values,
@@ -405,29 +355,23 @@ def plot_model_predictions_comparison(
         linewidths=1.5,
     )
 
-    # Styling
     ax.set_xlabel("Ocena", fontweight="bold", fontsize=12)
     ax.set_ylabel("Film", fontweight="bold", fontsize=12)
     ax.set_title(
         f"Porównanie Predykcji Modeli dla Użytkownika {sample_user_id}", fontweight="bold", pad=25, fontsize=20, loc="center"
     )
 
-    # Set y-ticks to movie names
     ax.set_yticks(y)
     ax.set_yticklabels(movie_labels, fontsize=11)
 
-    # Set x-axis limits and ticks
     ax.set_xlim(0.5, 5.5)
     ax.set_xticks(np.arange(1, 6))
 
-    # Add grid
     ax.grid(axis="x", alpha=0.3, linestyle="--")
     ax.grid(axis="y", alpha=0.1)
 
-    # Add vertical line at 2.5 (neutral)
     ax.axvline(x=2.5, color="gray", linestyle=":", alpha=0.5)
 
-    # Custom Legend
     from matplotlib.lines import Line2D
 
     legend_elements = [
@@ -458,7 +402,6 @@ def plot_model_predictions_comparison(
             )
         )
 
-    # Add color explanation to legend
     legend_elements.append(
         Line2D(
             [0],
@@ -484,7 +427,6 @@ def plot_model_predictions_comparison(
         )
     )
 
-    # Add Best Model explanation
     legend_elements.append(
         Line2D(
             [0],
@@ -514,7 +456,6 @@ def plot_model_predictions_comparison(
     )
 
     plt.tight_layout()
-    # Adjust layout to make room for legend at bottom
     plt.subplots_adjust(bottom=0.22)
 
     output_path = output_dir / "models" / "porownanie_predykcji_modeli.png"
@@ -523,7 +464,6 @@ def plot_model_predictions_comparison(
 
     print(f"\n✓ Saved plot to {output_path}")
 
-    # Print predictions table
     print("\nPredictions Summary:")
     print("=" * 80)
     print(f"{'Movie':<35} {'Actual':<8} " + " ".join(f"{m:<10}" for m in model_names))

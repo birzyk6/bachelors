@@ -28,7 +28,6 @@ class MovieViewSet(viewsets.ReadOnlyModelViewSet):
             serializer = self.get_serializer(movie)
             return Response(serializer.data)
         except Movie.DoesNotExist:
-            # Fetch from TMDB
             tmdb = TMDBClient()
             movie_data = tmdb.get_movie(int(tmdb_id))
             if movie_data:
@@ -84,13 +83,11 @@ class MovieViewSet(viewsets.ReadOnlyModelViewSet):
         if not tmdb_ids:
             return Response({"movies": []})
 
-        # Limit to 100 movies per request
         tmdb_ids = tmdb_ids[:100]
 
         movies = Movie.objects.filter(tmdb_id__in=tmdb_ids)
         serializer = MovieListSerializer(movies, many=True)
 
-        # Return as a dict keyed by tmdb_id for easy lookup
         movies_dict = {m["tmdb_id"]: m for m in serializer.data}
 
         return Response({"movies": movies_dict})

@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tensorflow_hub as hub
-import tensorflow_text  # Required for BERT preprocessing
+import tensorflow_text
 from sklearn.metrics.pairwise import cosine_similarity
 
 from .base import BaseRecommender
@@ -39,15 +39,13 @@ class ContentBasedModel(BaseRecommender):
         self.embedding_model_name = embedding_model
         self.similarity_metric = similarity_metric
 
-        # Load BERT model from TensorFlow Hub
         print(f"Loading TensorFlow Hub BERT model...")
         self.bert_encoder = hub.KerasLayer(self.embedding_model_name, trainable=False)
         self.bert_preprocess = hub.KerasLayer("https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3")
 
-        # Movie embeddings cache
-        self.movie_embeddings = {}  # movie_id -> embedding vector
-        self.movie_metadata = None  # DataFrame with movie info
-        self.user_profiles = {}  # user_id -> aggregated preference vector
+        self.movie_embeddings = {}
+        self.movie_metadata = None
+        self.user_profiles = {}
 
     def _encode_text(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
         """
@@ -65,11 +63,9 @@ class ContentBasedModel(BaseRecommender):
         for i in range(0, len(texts), batch_size):
             batch_texts = texts[i : i + batch_size]
 
-            # Preprocess and encode with BERT
             preprocessed = self.bert_preprocess(batch_texts)
             outputs = self.bert_encoder(preprocessed)
 
-            # Use pooled_output (CLS token representation)
             cls_embeddings = outputs["pooled_output"].numpy()
 
             embeddings.append(cls_embeddings)
@@ -95,10 +91,8 @@ class ContentBasedModel(BaseRecommender):
             print(f"Training {self.name} model...")
             print(f"  Movies: {len(movie_data)}")
 
-        # Store movie metadata
         self.movie_metadata = movie_data.copy()
 
-        # Try to load pre-computed embeddings first
         try:
             from config import MODELS_DIR
         except ImportError:
@@ -119,7 +113,6 @@ class ContentBasedModel(BaseRecommender):
             if verbose:
                 print(f"  ✓ Loaded {len(self.movie_embeddings):,} pre-computed embeddings")
         else:
-            # Fall back to computing embeddings
             overviews = movie_data["overview"].fillna("").tolist()
             movie_ids = movie_data["movieId"].tolist()
 
@@ -127,17 +120,14 @@ class ContentBasedModel(BaseRecommender):
                 print(f"  Encoding {len(overviews)} movie overviews with BERT...")
                 print(f"  (Tip: Run 'python precompute_embeddings.py' first to speed this up)")
 
-            # Encode all overviews
             embeddings = self._encode_text(overviews)
 
-            # Store in dictionary
             for movie_id, embedding in zip(movie_ids, embeddings):
                 self.movie_embeddings[movie_id] = embedding
 
             if verbose:
                 print(f"  ✓ Encoded {len(self.movie_embeddings)} movies")
 
-        # Build user profiles if ratings provided
         if train_ratings is not None:
             if verbose:
                 print(f"  Building user preference profiles...")
@@ -154,17 +144,14 @@ class ContentBasedModel(BaseRecommender):
         Args:
             ratings: DataFrame with [userId, movieId, rating]
         """
-        # Filter to high ratings (>= 4.0)
         liked_movies = ratings[ratings["rating"] >= 4.0]
 
         for user_id in liked_movies["userId"].unique():
             user_movies = liked_movies[liked_movies["userId"] == user_id]["movieId"].tolist()
 
-            # Get embeddings for user's liked movies
             user_embeddings = [self.movie_embeddings[mid] for mid in user_movies if mid in self.movie_embeddings]
 
             if user_embeddings:
-                # Average embeddings to create user profile
                 self.user_profiles[user_id] = np.mean(user_embeddings, axis=0)
 
     def predict(self, user_movie_pairs: pd.DataFrame) -> np.ndarray:
@@ -186,23 +173,18 @@ class ContentBasedModel(BaseRecommender):
             user_id = row["userId"]
             movie_id = row["movieId"]
 
-            # Get user profile
             if user_id not in self.user_profiles or movie_id not in self.movie_embeddings:
-                predictions.append(2.5)  # Default neutral rating
+                predictions.append(2.5)
                 continue
 
-            # Compute similarity
             user_vector = self.user_profiles[user_id].reshape(1, -1)
             movie_vector = self.movie_embeddings[movie_id].reshape(1, -1)
 
             if self.similarity_metric == "cosine":
                 similarity = cosine_similarity(user_vector, movie_vector)[0, 0]
-            else:  # dot product
+            else:
                 similarity = np.dot(user_vector, movie_vector.T)[0, 0]
 
-            # Scale to rating range [0.5, 5.0]
-            # BERT embeddings typically produce high similarities (0.7-1.0)
-            # Map this range to [0.5, 5.0] for more realistic predictions
             min_sim = 0.7
             max_sim = 1.0
             similarity_normalized = (similarity - min_sim) / (max_sim - min_sim)
@@ -237,17 +219,13 @@ class ContentBasedModel(BaseRecommender):
             raise ValueError("Model must be fitted before calling recommend()")
 
         if user_id not in self.user_profiles:
-            # Cold start: return popular movies
             return self._recommend_popular(top_k)
 
-        # Get user preference vector
         user_vector = self.user_profiles[user_id]
 
-        # Get candidate movies
         if candidate_movies is None:
             candidate_movies = list(self.movie_embeddings.keys())
 
-        # Compute similarities
         similarities = []
         for movie_id in candidate_movies:
             if movie_id not in self.movie_embeddings:
@@ -265,7 +243,6 @@ class ContentBasedModel(BaseRecommender):
 
             similarities.append((movie_id, float(sim)))
 
-        # Sort by similarity
         similarities.sort(key=lambda x: x[1], reverse=True)
 
         return similarities[:top_k]
@@ -273,7 +250,6 @@ class ContentBasedModel(BaseRecommender):
     def _recommend_popular(self, top_k: int) -> List[Tuple[int, float]]:
         """Fallback: recommend popular movies for cold-start users."""
         if self.movie_metadata is None or "popularity" not in self.movie_metadata.columns:
-            # Return first K movies as fallback
             return [(mid, 1.0) for mid in list(self.movie_embeddings.keys())[:top_k]]
 
         popular = self.movie_metadata.nlargest(top_k, "popularity")[["movieId", "popularity"]].values.tolist()
@@ -294,21 +270,18 @@ class ContentBasedModel(BaseRecommender):
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
-        # Save movie embeddings dictionary as arrays
         if self.movie_embeddings:
             movie_ids = list(self.movie_embeddings.keys())
             embeddings = np.array([self.movie_embeddings[mid] for mid in movie_ids])
             np.save(path / "movie_embeddings.npy", embeddings)
             np.save(path / "movie_ids.npy", np.array(movie_ids))
 
-        # Save user profiles dictionary as arrays
         if self.user_profiles:
             user_ids = list(self.user_profiles.keys())
             profiles = np.array([self.user_profiles[uid] for uid in user_ids])
             np.save(path / "user_profiles.npy", profiles)
             np.save(path / "user_ids.npy", np.array(user_ids))
 
-        # Save hyperparameters
         with open(path / "params.json", "w") as f:
             json.dump(self.get_params(), f)
 
@@ -318,7 +291,6 @@ class ContentBasedModel(BaseRecommender):
 
         path = Path(path)
 
-        # Load movie embeddings dictionary
         embeddings_path = path / "movie_embeddings.npy"
         movie_ids_path = path / "movie_ids.npy"
         if embeddings_path.exists() and movie_ids_path.exists():
@@ -326,7 +298,6 @@ class ContentBasedModel(BaseRecommender):
             movie_ids = np.load(movie_ids_path)
             self.movie_embeddings = {int(mid): emb for mid, emb in zip(movie_ids, embeddings)}
 
-        # Load user profiles dictionary
         profiles_path = path / "user_profiles.npy"
         user_ids_path = path / "user_ids.npy"
         if profiles_path.exists() and user_ids_path.exists():
@@ -334,7 +305,6 @@ class ContentBasedModel(BaseRecommender):
             user_ids = np.load(user_ids_path)
             self.user_profiles = {int(uid): prof for uid, prof in zip(user_ids, profiles)}
 
-        # Load params
         params_path = path / "params.json"
         if params_path.exists():
             with open(params_path) as f:

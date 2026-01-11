@@ -63,12 +63,11 @@ def main():
     print("\nEstimated total time: ~2 hours")
     print("\nResults will be saved to model/metrics/ and model/saved_models/")
 
-    # Training scripts in order
     scripts = [
         "train_collaborative.py",
         "train_knn.py",
         "train_ncf.py",
-        "train_content_based.py",  # Run after others (slowest)
+        "train_content_based.py",
         "train_two_tower.py",
     ]
 
@@ -85,12 +84,6 @@ def main():
         success = run_script(script)
         results[script] = "success" if success else "failed"
 
-        # Stop if a critical failure occurs (optional)
-        # if not success:
-        #     print("\n⚠️  Stopping due to failure. Fix the error and re-run.")
-        #     break
-
-    # Summary
     overall_duration = (datetime.now() - overall_start).total_seconds()
 
     print("\n" + "=" * 80)
@@ -104,7 +97,6 @@ def main():
     print(f"\nTotal time: {overall_duration / 60:.1f} minutes")
     print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Check if all succeeded
     all_success = all(status == "success" for status in results.values())
 
     if all_success:

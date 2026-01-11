@@ -21,10 +21,8 @@ import seaborn as sns
 
 from .plots import COLORS, POLISH_LABELS, set_thesis_style
 
-# Extended Polish labels for EDA
 EDA_LABELS = {
     **POLISH_LABELS,
-    # Titles
     "user_activity": "Rozkład aktywności użytkowników",
     "movie_popularity": "Rozkład popularności filmów",
     "ratings_over_time": "Liczba ocen w czasie",
@@ -33,7 +31,6 @@ EDA_LABELS = {
     "rating_by_genre": "Rozkład ocen według gatunku",
     "top_rated_movies": "Najwyżej oceniane filmy",
     "most_rated_movies": "Najczęściej oceniane filmy",
-    # Axis labels
     "num_ratings": "Liczba ocen",
     "num_users": "Liczba użytkowników",
     "num_movies": "Liczba filmów",
@@ -42,7 +39,6 @@ EDA_LABELS = {
     "avg_rating": "Średnia ocena",
     "rating_count": "Liczba ocen",
     "density": "Gęstość",
-    # Other
     "log_scale": "(skala logarytmiczna)",
     "power_law": "Rozkład potęgowy",
     "sparsity": "Rzadkość",
@@ -69,33 +65,28 @@ def plot_rating_distribution_detailed(
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Calculate statistics
     mean_rating = ratings.mean()
     median_rating = ratings.median()
     std_rating = ratings.std()
     total_ratings = len(ratings)
 
-    # Create histogram with better bins for 0.5-5.0 scale
     bins = np.arange(0.25, 5.75, 0.5)
     counts, _, patches = ax.hist(ratings, bins=bins, color=COLORS[0], edgecolor="black", alpha=0.7, rwidth=0.85)
 
-    # Color bars by rating value (gradient)
     for i, (patch, count) in enumerate(zip(patches, counts)):
         rating_val = 0.5 + i * 0.5
         if rating_val >= 4.0:
-            patch.set_facecolor("#2ecc71")  # Green for high ratings
+            patch.set_facecolor("#2ecc71")
         elif rating_val >= 3.0:
-            patch.set_facecolor("#f1c40f")  # Yellow for medium
+            patch.set_facecolor("#f1c40f")
         else:
-            patch.set_facecolor("#e74c3c")  # Red for low
+            patch.set_facecolor("#e74c3c")
 
-    # Add vertical lines for statistics
     ax.axvline(mean_rating, color="navy", linestyle="--", linewidth=2, label=f"{EDA_LABELS['mean']}: {mean_rating:.2f}")
     ax.axvline(
         median_rating, color="darkred", linestyle=":", linewidth=2, label=f"{EDA_LABELS['median']}: {median_rating:.2f}"
     )
 
-    # Add text box with statistics
     stats_text = f"n = {total_ratings:,}\n" f"σ = {std_rating:.2f}"
     ax.text(
         0.02,
@@ -107,7 +98,6 @@ def plot_rating_distribution_detailed(
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
     )
 
-    # Styling
     ax.set_xlabel(EDA_LABELS["rating"], fontweight="bold")
     ax.set_ylabel(EDA_LABELS["frequency"], fontweight="bold")
     ax.set_title(title, fontweight="bold", pad=20)
@@ -137,12 +127,10 @@ def plot_user_activity_distribution(
     """
     set_thesis_style()
 
-    # Count ratings per user
     user_counts = ratings_df.groupby("userId").size()
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Left plot: Histogram
     ax1 = axes[0]
     ax1.hist(user_counts, bins=50, color=COLORS[0], edgecolor="black", alpha=0.7)
     if log_scale:
@@ -152,7 +140,6 @@ def plot_user_activity_distribution(
     ax1.set_title(EDA_LABELS["user_activity"], fontweight="bold")
     ax1.grid(axis="y", alpha=0.3)
 
-    # Add statistics
     stats_text = (
         f"{EDA_LABELS['mean']}: {user_counts.mean():.1f}\n"
         f"{EDA_LABELS['median']}: {user_counts.median():.1f}\n"
@@ -170,7 +157,6 @@ def plot_user_activity_distribution(
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
     )
 
-    # Right plot: Log-log plot (power law visualization)
     ax2 = axes[1]
     counts_sorted = np.sort(user_counts.values)[::-1]
     ranks = np.arange(1, len(counts_sorted) + 1)
@@ -203,12 +189,10 @@ def plot_movie_popularity_distribution(
     """
     set_thesis_style()
 
-    # Count ratings per movie
     movie_counts = ratings_df.groupby("movieId").size()
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Left plot: Histogram
     ax1 = axes[0]
     ax1.hist(movie_counts, bins=50, color=COLORS[1], edgecolor="black", alpha=0.7)
     if log_scale:
@@ -218,7 +202,6 @@ def plot_movie_popularity_distribution(
     ax1.set_title(EDA_LABELS["movie_popularity"], fontweight="bold")
     ax1.grid(axis="y", alpha=0.3)
 
-    # Add statistics
     stats_text = (
         f"{EDA_LABELS['mean']}: {movie_counts.mean():.1f}\n"
         f"{EDA_LABELS['median']}: {movie_counts.median():.1f}\n"
@@ -236,7 +219,6 @@ def plot_movie_popularity_distribution(
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
     )
 
-    # Right plot: Cumulative distribution (long tail)
     ax2 = axes[1]
     counts_sorted = np.sort(movie_counts.values)[::-1]
     cumsum = np.cumsum(counts_sorted)
@@ -246,7 +228,6 @@ def plot_movie_popularity_distribution(
     ax2.plot(pct_movies, cumsum_pct, color=COLORS[1], linewidth=2)
     ax2.fill_between(pct_movies, cumsum_pct, alpha=0.3, color=COLORS[1])
 
-    # Mark 80/20 rule
     idx_80 = np.searchsorted(cumsum_pct, 80)
     pct_80 = pct_movies[idx_80] if idx_80 < len(pct_movies) else 100
     ax2.axhline(80, color="red", linestyle="--", alpha=0.7)
@@ -282,19 +263,15 @@ def plot_genre_frequency(
     """
     set_thesis_style()
 
-    # Parse genres (pipe or comma separated)
     all_genres = []
     for genre_str in ratings_df["genres"].dropna():
         if isinstance(genre_str, str):
-            # Handle both pipe and comma separation
             if "|" in genre_str:
                 all_genres.extend(genre_str.split("|"))
             else:
                 all_genres.extend([g.strip() for g in genre_str.split(",")])
 
-    # Count frequencies
     genre_counts = Counter(all_genres)
-    # Remove "(no genres listed)" if present
     genre_counts.pop("(no genres listed)", None)
     top_genres = genre_counts.most_common(top_n)
 
@@ -303,11 +280,9 @@ def plot_genre_frequency(
     genres = [g for g, _ in top_genres]
     counts = [c for _, c in top_genres]
 
-    # Create horizontal bar chart
     y_pos = np.arange(len(genres))
     bars = ax.barh(y_pos, counts, color=COLORS[2], edgecolor="black", alpha=0.7)
 
-    # Add count labels (inside bar if > 75% of max, outside otherwise)
     max_count = max(counts) if counts else 1
     for bar, count in zip(bars, counts):
         if count > 0.75 * max_count:
@@ -362,13 +337,11 @@ def plot_ratings_over_time(
     """
     set_thesis_style()
 
-    # Convert timestamp to datetime
     if "timestamp" in ratings_df.columns:
         df = ratings_df.copy()
         df["datetime"] = pd.to_datetime(df["timestamp"], unit="s")
         df.set_index("datetime", inplace=True)
 
-        # Resample and count
         ratings_over_time = df.resample(resample_freq).size()
 
         fig, ax = plt.subplots(figsize=(14, 6))
@@ -381,7 +354,6 @@ def plot_ratings_over_time(
         ax.set_title(EDA_LABELS["ratings_over_time"], fontweight="bold", pad=20)
         ax.grid(True, alpha=0.3)
 
-        # Format x-axis
         fig.autofmt_xdate()
 
         plt.tight_layout()
@@ -408,7 +380,6 @@ def plot_rating_by_genre(
     """
     set_thesis_style()
 
-    # Expand genres (one row per genre)
     genre_ratings = []
     for _, row in ratings_df.iterrows():
         genre_str = row.get("genres", "")
@@ -428,17 +399,14 @@ def plot_rating_by_genre(
 
     genre_df = pd.DataFrame(genre_ratings)
 
-    # Get top genres by count
     top_genres = genre_df["genre"].value_counts().head(top_n).index.tolist()
     genre_df = genre_df[genre_df["genre"].isin(top_genres)]
 
-    # Calculate mean ratings and sort
     genre_means = genre_df.groupby("genre")["rating"].mean().sort_values(ascending=False)
     ordered_genres = genre_means.index.tolist()
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Box plot
     genre_df["genre"] = pd.Categorical(genre_df["genre"], categories=ordered_genres, ordered=True)
     sns.boxplot(data=genre_df, x="genre", y="rating", ax=ax, palette="Set2")
 
@@ -480,7 +448,6 @@ def plot_sparsity_visualization(
     """
     set_thesis_style()
 
-    # Sample users and movies for visualization
     unique_users = ratings_df["userId"].unique()
     unique_movies = ratings_df["movieId"].unique()
 
@@ -494,23 +461,18 @@ def plot_sparsity_visualization(
     else:
         sampled_movies = unique_movies
 
-    # Filter data
     filtered_df = ratings_df[ratings_df["userId"].isin(sampled_users) & ratings_df["movieId"].isin(sampled_movies)]
 
-    # Create mapping
     user_map = {u: i for i, u in enumerate(sorted(sampled_users))}
     movie_map = {m: i for i, m in enumerate(sorted(sampled_movies))}
 
-    # Create sparse matrix representation
     rows = [user_map[u] for u in filtered_df["userId"]]
     cols = [movie_map[m] for m in filtered_df["movieId"]]
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    # Plot as scatter (faster than imshow for sparse data)
     ax.scatter(cols, rows, s=0.5, c=COLORS[0], alpha=0.5)
 
-    # Calculate sparsity
     total_cells = len(sampled_users) * len(sampled_movies)
     filled_cells = len(filtered_df)
     sparsity = 1 - (filled_cells / total_cells)
@@ -538,7 +500,7 @@ def plot_top_movies(
     output_path: Path,
     top_n: int = 20,
     min_ratings: int = 100,
-    by: str = "rating",  # "rating" or "count"
+    by: str = "rating",
 ):
     """
     Plot top movies by average rating or rating count.
@@ -553,15 +515,12 @@ def plot_top_movies(
     """
     set_thesis_style()
 
-    # Aggregate ratings per movie
     movie_stats = (
         ratings_df.groupby("movieId").agg(avg_rating=("rating", "mean"), rating_count=("rating", "count")).reset_index()
     )
 
-    # Filter by minimum ratings
     movie_stats = movie_stats[movie_stats["rating_count"] >= min_ratings]
 
-    # Sort and get top N
     if by == "rating":
         movie_stats = movie_stats.sort_values("avg_rating", ascending=False).head(top_n)
         title = EDA_LABELS["top_rated_movies"] + f" (min. {min_ratings} ocen)"
@@ -573,7 +532,6 @@ def plot_top_movies(
         value_col = "rating_count"
         xlabel = EDA_LABELS["num_ratings"]
 
-    # Get movie titles
     title_col = "title_ml" if "title_ml" in movies_df.columns else "title"
     movie_titles = dict(zip(movies_df["movieId"], movies_df[title_col]))
     movie_stats["title"] = movie_stats["movieId"].map(movie_titles)
@@ -586,7 +544,6 @@ def plot_top_movies(
 
     bars = ax.barh(y_pos, values, color=COLORS[3], edgecolor="black", alpha=0.7)
 
-    # Add value labels (inside bar if > 75% of max, outside otherwise)
     max_val = max(values) if len(values) > 0 else 1
     for bar, val in zip(bars, values):
         if by == "rating":
@@ -646,11 +603,9 @@ def generate_all_eda_plots(
     print("Generowanie wykresów eksploracyjnej analizy danych (EDA)")
     print("=" * 80)
 
-    # Create output directory
     eda_dir = output_dir / "eda"
     eda_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load data
     print("\nŁadowanie danych...")
     train_file = data_dir / "train.parquet"
     movies_file = data_dir / "movies.parquet"
@@ -667,36 +622,24 @@ def generate_all_eda_plots(
         movies_df = pl.read_parquet(movies_file).to_pandas()
         print(f"  Załadowano {len(movies_df):,} filmów")
 
-    # Generate plots
     print("\nGenerowanie wykresów...")
 
-    # 1. Rating distribution
     plot_rating_distribution_detailed(train_df["rating"], eda_dir / "rozklad_ocen.png")
 
-    # 2. User activity
     plot_user_activity_distribution(train_df, eda_dir / "aktywnosc_uzytkownikow.png")
 
-    # 3. Movie popularity
     plot_movie_popularity_distribution(train_df, eda_dir / "popularnosc_filmow.png")
 
-    # 4. Genre frequency
     if "genres" in train_df.columns:
         plot_genre_frequency(train_df, eda_dir / "czestotliwosc_gatunkow.png")
 
-    # 5. Ratings over time
     if "timestamp" in train_df.columns:
         plot_ratings_over_time(train_df, eda_dir / "oceny_w_czasie.png")
 
-    # 6. Rating by genre
     if "genres" in train_df.columns:
-        # Sample for faster processing
         sample_df = train_df.sample(n=min(100000, len(train_df)), random_state=42)
         plot_rating_by_genre(sample_df, eda_dir / "oceny_wg_gatunku.png")
 
-    # 7. Sparsity visualization - REMOVED (not useful)
-    # plot_sparsity_visualization(train_df, eda_dir / "rzadkosc_macierzy.png")
-
-    # 8. Top movies
     if movies_df is not None:
         plot_top_movies(train_df, movies_df, eda_dir / "najwyzej_oceniane.png", by="rating")
         plot_top_movies(train_df, movies_df, eda_dir / "najczesciej_oceniane.png", by="count")

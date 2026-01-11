@@ -31,7 +31,6 @@ class Command(BaseCommand):
         embeddings_path = options.get("embeddings_path")
 
         if not embeddings_path:
-            # Use default path
             embeddings_path = Path(settings.EMBEDDINGS_PATH) / "combined_movie_embeddings.npy"
         else:
             embeddings_path = Path(embeddings_path)
@@ -42,14 +41,12 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"Embeddings file not found: {embeddings_path}"))
             return
 
-        # Initialize Qdrant service
         try:
             qdrant = QdrantService()
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"Failed to connect to Qdrant: {e}"))
             return
 
-        # Clear collection if requested
         if options.get("clear"):
             self.stdout.write("Clearing existing collection...")
             try:
@@ -58,7 +55,6 @@ class Command(BaseCommand):
             except Exception:
                 pass
 
-        # Load embeddings
         self.stdout.write("Loading embeddings into Qdrant...")
         try:
             count = qdrant.load_embeddings(str(embeddings_path))
@@ -67,6 +63,5 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"Failed to load embeddings: {e}"))
             raise
 
-        # Show collection info
         info = qdrant.get_collection_info()
         self.stdout.write(f"Collection status: {info}")

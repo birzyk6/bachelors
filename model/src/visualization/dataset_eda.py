@@ -20,13 +20,10 @@ import seaborn as sns
 
 from .plots import COLORS, set_thesis_style
 
-# Polish labels for dataset EDA
 DATASET_LABELS = {
-    # Dataset names
     "movielens": "MovieLens",
     "tmdb": "TMDB",
     "combined": "Połączone",
-    # Titles
     "dataset_overview": "Przegląd zbiorów danych",
     "dataset_sizes": "Rozmiary zbiorów danych",
     "data_pipeline": "Proces przetwarzania danych",
@@ -37,7 +34,6 @@ DATASET_LABELS = {
     "temporal_coverage": "Pokrycie czasowe",
     "data_quality": "Jakość danych",
     "preprocessing_stats": "Statystyki przetwarzania",
-    # Axis labels
     "num_movies": "Liczba filmów",
     "num_ratings": "Liczba ocen",
     "num_users": "Liczba użytkowników",
@@ -46,7 +42,6 @@ DATASET_LABELS = {
     "count": "Liczba",
     "percentage": "Procent",
     "density": "Gęstość",
-    # Metrics
     "with_metadata": "Z metadanymi",
     "without_metadata": "Bez metadanych",
     "overlap": "Wspólne",
@@ -80,7 +75,6 @@ def plot_dataset_sizes_comparison(
     datasets = ["MovieLens", "TMDB", "Połączone"]
     colors_list = [COLORS[0], COLORS[1], COLORS[2]]
 
-    # 1. Number of movies
     movies = [
         ml_stats.get("num_movies", 0),
         tmdb_stats.get("num_movies", 0),
@@ -96,10 +90,9 @@ def plot_dataset_sizes_comparison(
         else:
             axes[0].text(i, m, f"{m:,}", ha="center", va="bottom", fontweight="bold", fontsize=10)
 
-    # 2. Number of ratings
     ratings = [
         ml_stats.get("num_ratings", 0),
-        0,  # TMDB doesn't have ratings
+        0,
         combined_stats.get("num_ratings", 0),
     ]
     axes[1].bar(datasets, ratings, color=colors_list, alpha=0.7, edgecolor="black", linewidth=1.5)
@@ -115,10 +108,9 @@ def plot_dataset_sizes_comparison(
         else:
             axes[1].text(i, 0, "brak", ha="center", va="center", fontweight="bold", fontsize=10, color="gray")
 
-    # 3. Number of users
     users = [
         ml_stats.get("num_users", 0),
-        0,  # TMDB doesn't have users
+        0,
         combined_stats.get("num_users", 0),
     ]
     axes[2].bar(datasets, users, color=colors_list, alpha=0.7, edgecolor="black", linewidth=1.5)
@@ -159,19 +151,16 @@ def plot_movie_overlap_venn(
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    # Calculate overlaps
     overlap = ml_movies & tmdb_movies
     ml_only = ml_movies - tmdb_movies
     tmdb_only = tmdb_movies - ml_movies
 
-    # Create bar chart instead of Venn (more precise)
     categories = ["Tylko\nMovieLens", "Wspólne", "Tylko\nTMDB"]
     values = [len(ml_only), len(overlap), len(tmdb_only)]
     colors_list = [COLORS[0], COLORS[2], COLORS[1]]
 
     bars = ax.bar(categories, values, color=colors_list, alpha=0.7, edgecolor="black", linewidth=2)
 
-    # Add value labels
     max_val = max(values) if values else 1
     for i, (bar, val) in enumerate(zip(bars, values)):
         height = bar.get_height()
@@ -200,7 +189,6 @@ def plot_movie_overlap_venn(
     ax.set_ylabel(DATASET_LABELS["num_movies"], fontweight="bold", fontsize=12)
     ax.set_title("Wspólne filmy między zbiorami danych", fontweight="bold", fontsize=14, pad=20)
 
-    # Add summary text
     total = len(ml_movies | tmdb_movies)
     summary_text = f"Razem unikalnych filmów: {total:,}\n"
     summary_text += f"Pokrycie: {len(overlap)/len(ml_movies)*100:.1f}% filmów ML ma metadane TMDB"
@@ -237,11 +225,9 @@ def plot_tmdb_enrichment(
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
-    # Count movies with/without TMDB metadata
     has_tmdb = movies_df["tmdbId"].notna().sum()
     no_tmdb = movies_df["tmdbId"].isna().sum()
 
-    # Pie chart
     labels = ["Z metadanymi TMDB", "Bez metadanych TMDB"]
     sizes = [has_tmdb, no_tmdb]
     colors_list = [COLORS[2], COLORS[3]]
@@ -258,7 +244,6 @@ def plot_tmdb_enrichment(
     )
     axes[0].set_title("Pokrycie metadanych TMDB", fontweight="bold", pad=15)
 
-    # Check if overview column exists
     if "overview" in movies_df.columns:
         has_overview = movies_df["overview"].notna().sum()
         has_nonempty_overview = (movies_df["overview"].fillna("").str.len() > 0).sum()
@@ -272,7 +257,6 @@ def plot_tmdb_enrichment(
         axes[1].set_ylabel(DATASET_LABELS["num_movies"], fontweight="bold")
         axes[1].set_title("Dostępność metadanych", fontweight="bold", pad=15)
 
-        # Add value labels
         max_val = max(values) if values else 1
         for bar, val in zip(bars, values):
             height = bar.get_height()
@@ -322,25 +306,21 @@ def plot_genre_distribution_comparison(
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    # Extract genres for MovieLens
     ml_genres = []
     for genres_str in ml_df["genres"].dropna():
         if genres_str and genres_str != "(no genres listed)":
             ml_genres.extend(genres_str.split("|"))
     ml_genre_counts = Counter(ml_genres).most_common(top_n)
 
-    # Extract genres for TMDB
     tmdb_genres = []
     for genres_str in tmdb_df["genres"].dropna():
         if genres_str and genres_str != "(no genres listed)":
-            # Handle both formats: comma-separated and pipe-separated
             if "," in genres_str:
                 tmdb_genres.extend([g.strip() for g in genres_str.split(",")])
             else:
                 tmdb_genres.extend(genres_str.split("|"))
     tmdb_genre_counts = Counter(tmdb_genres).most_common(top_n)
 
-    # Plot MovieLens genres
     genres_ml, counts_ml = zip(*ml_genre_counts) if ml_genre_counts else ([], [])
     axes[0].barh(range(len(genres_ml)), counts_ml, color=COLORS[0], alpha=0.7, edgecolor="black")
     axes[0].set_yticks(range(len(genres_ml)))
@@ -349,7 +329,6 @@ def plot_genre_distribution_comparison(
     axes[0].set_title("MovieLens - rozkład gatunków", fontweight="bold", pad=15)
     axes[0].invert_yaxis()
 
-    # Add value labels (inside bar if > 75% of max, outside otherwise)
     max_count_ml = max(counts_ml) if counts_ml else 1
     for i, count in enumerate(counts_ml):
         if count > 0.75 * max_count_ml:
@@ -357,7 +336,6 @@ def plot_genre_distribution_comparison(
         else:
             axes[0].text(count, i, f" {count:,}", va="center", ha="left", fontweight="bold")
 
-    # Plot TMDB genres
     genres_tmdb, counts_tmdb = zip(*tmdb_genre_counts) if tmdb_genre_counts else ([], [])
     axes[1].barh(range(len(genres_tmdb)), counts_tmdb, color=COLORS[1], alpha=0.7, edgecolor="black")
     axes[1].set_yticks(range(len(genres_tmdb)))
@@ -366,7 +344,6 @@ def plot_genre_distribution_comparison(
     axes[1].set_title("TMDB - rozkład gatunków", fontweight="bold", pad=15)
     axes[1].invert_yaxis()
 
-    # Add value labels (inside bar if > 75% of max, outside otherwise)
     max_count_tmdb = max(counts_tmdb) if counts_tmdb else 1
     for i, count in enumerate(counts_tmdb):
         if count > 0.75 * max_count_tmdb:
@@ -399,10 +376,8 @@ def plot_temporal_coverage(
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Extract years
     ml_years = ml_df["year"].dropna().astype(int)
 
-    # For TMDB, extract from release_date if available
     if "release_date" in tmdb_df.columns:
         tmdb_years = pd.to_datetime(tmdb_df["release_date"], errors="coerce").dt.year.dropna().astype(int)
     elif "year" in tmdb_df.columns:
@@ -410,7 +385,6 @@ def plot_temporal_coverage(
     else:
         tmdb_years = pd.Series([], dtype=int)
 
-    # Create histograms
     bins = np.arange(1900, 2030, 5)
     ax.hist(ml_years, bins=bins, alpha=0.6, label="MovieLens", color=COLORS[0], edgecolor="black")
     if len(tmdb_years) > 0:
@@ -422,7 +396,6 @@ def plot_temporal_coverage(
     ax.legend(fontsize=11)
     ax.grid(axis="y", alpha=0.3)
 
-    # Add statistics
     stats_text = f"MovieLens: {ml_years.min():.0f} - {ml_years.max():.0f}\n"
     if len(tmdb_years) > 0:
         stats_text += f"TMDB: {tmdb_years.min():.0f} - {tmdb_years.max():.0f}"
@@ -459,7 +432,6 @@ def plot_preprocessing_pipeline(
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 5))
 
-    # 1. Data splitting
     splits = ["Treningowy", "Walidacyjny", "Testowy"]
     split_counts = [
         preprocessing_stats.get("train_ratings", 0),
@@ -487,7 +459,6 @@ def plot_preprocessing_pipeline(
         else:
             axes[0].text(i, count, f"{count:,}\n({pct:.1f}%)", ha="center", va="bottom", fontweight="bold", fontsize=9)
 
-    # 2. Rating distribution
     rating_stats = {
         "Min.": preprocessing_stats.get("rating_min", 0),
         "Średnia": preprocessing_stats.get("rating_mean", 0),
@@ -499,7 +470,6 @@ def plot_preprocessing_pipeline(
     axes[1].set_ylim(0, 5.5)
     max_rating = max(rating_stats.values()) if rating_stats.values() else 1
     for i, (stat, val) in enumerate(rating_stats.items()):
-        # For ratings (0-5 scale), 75% threshold of 5.5 max would be ~4.1, so max rating likely inside
         if val > 0.75 * 5.5:
             axes[1].text(i, val * 0.5, f"{val:.2f}", ha="center", va="center", fontweight="bold", fontsize=10, color="black")
         else:
@@ -531,13 +501,11 @@ def generate_dataset_statistics(
 
     print("\nGenerowanie statystyk zbiorów danych...")
 
-    # Load processed data
     train_df = pl.read_parquet(data_dir / "train.parquet")
     val_df = pl.read_parquet(data_dir / "val.parquet")
     test_df = pl.read_parquet(data_dir / "test.parquet")
     movies_df = pl.read_parquet(data_dir / "movies.parquet")
 
-    # MovieLens statistics
     ml_stats = {
         "num_movies": len(movies_df),
         "num_users": train_df.select("userId").unique().height,
@@ -553,12 +521,10 @@ def generate_dataset_statistics(
         "movies_without_tmdb": int(movies_df.filter(pl.col("tmdbId").is_null()).height),
     }
 
-    # Save MovieLens stats
     with open(output_dir / "movielens_stats.json", "w") as f:
         json.dump(ml_stats, f, indent=2)
     print(f"  ✓ Saved movielens_stats.json")
 
-    # TMDB statistics (if available)
     tmdb_csv_path = data_dir.parent / "raw" / "tmdb" / "TMDB_movie_dataset_v11.csv"
     tmdb_stats = {}
     if tmdb_csv_path.exists():
@@ -577,7 +543,6 @@ def generate_dataset_statistics(
             json.dump(tmdb_stats, f, indent=2)
         print(f"  ✓ Saved tmdb_stats.json")
 
-    # Combined statistics
     combined_stats = {
         "num_movies": ml_stats["num_movies"],
         "num_users": ml_stats["num_users"],
@@ -616,25 +581,21 @@ def generate_all_dataset_eda(
     print("Dataset Exploratory Data Analysis")
     print("=" * 80)
 
-    # Create output directories
     eda_dir = plots_dir / "eda" / "datasets"
     eda_dir.mkdir(parents=True, exist_ok=True)
 
     metrics_dir = plots_dir.parent / "metrics"
     metrics_dir.mkdir(parents=True, exist_ok=True)
 
-    # Generate statistics
     all_stats = generate_dataset_statistics(data_dir, metrics_dir)
     ml_stats = all_stats["movielens"]
     tmdb_stats = all_stats["tmdb"]
     combined_stats = all_stats["combined"]
 
-    # Load dataframes for plotting
     print("\nŁadowanie danych do wizualizacji...")
     movies_df = pd.read_parquet(data_dir / "movies.parquet")
     print(f"  Załadowano {len(movies_df):,} filmów")
 
-    # Load TMDB data
     tmdb_csv_path = data_dir.parent / "raw" / "tmdb" / "TMDB_movie_dataset_v11.csv"
     if tmdb_csv_path.exists():
         print(f"  Ładowanie danych TMDB z {tmdb_csv_path.name}...")
@@ -644,30 +605,23 @@ def generate_all_dataset_eda(
         print(f"  ⚠ Nie znaleziono pliku TMDB")
         tmdb_df = pd.DataFrame()
 
-    # Generate plots
     print("\nGenerowanie wykresów...")
 
-    # 1. Dataset sizes comparison
     plot_dataset_sizes_comparison(ml_stats, tmdb_stats, combined_stats, eda_dir / "porownanie_rozmiarow.png")
 
-    # 2. Movie overlap
     if not tmdb_df.empty:
         ml_movie_ids = set(movies_df["tmdbId"].dropna().astype(int))
         tmdb_movie_ids = set(tmdb_df["id"].dropna().astype(int))
         plot_movie_overlap_venn(ml_movie_ids, tmdb_movie_ids, eda_dir / "wspolne_filmy.png")
 
-    # 3. TMDB enrichment
     plot_tmdb_enrichment(movies_df, eda_dir / "wzbogacenie_tmdb.png")
 
-    # 4. Genre distribution comparison
     if not tmdb_df.empty:
         plot_genre_distribution_comparison(movies_df, tmdb_df, eda_dir / "porownanie_gatunkow.png")
 
-    # 5. Temporal coverage
     if not tmdb_df.empty:
         plot_temporal_coverage(movies_df, tmdb_df, eda_dir / "pokrycie_czasowe.png")
 
-    # 6. Preprocessing pipeline
     preprocessing_stats = {
         **ml_stats,
         "total_ratings": ml_stats["num_ratings"],

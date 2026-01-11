@@ -13,13 +13,11 @@ import polars as pl
 
 from model.src.evaluation.metrics import evaluate_ranking, evaluate_rating_predictions, get_relevant_items_from_test
 
-# Paths
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "processed"
 METRICS_DIR = Path(__file__).parent.parent.parent / "metrics"
 
 
 def load_test_data() -> pd.DataFrame:
-    """Load test dataset."""
     print("Loading test data...")
     df = pl.read_parquet(DATA_DIR / "test.parquet").to_pandas()
     print(f"  ✓ Loaded {len(df):,} test samples")
@@ -39,18 +37,15 @@ def evaluate_model_rating_prediction(model, test_data: pd.DataFrame) -> dict:
     """
     print(f"\nEvaluating {model.name} (Rating Prediction)...")
 
-    # Prepare test pairs
     user_movie_pairs = test_data[["userId", "movieId"]].copy()
     y_true = test_data["rating"].values
 
-    # Predict
     try:
         y_pred = model.predict(user_movie_pairs)
     except NotImplementedError:
         print(f"  → {model.name} does not support rating prediction")
         return {"rmse": None, "mae": None}
 
-    # Compute metrics
     metrics = evaluate_rating_predictions(y_true, y_pred)
 
     print(f"  RMSE: {metrics['rmse']:.4f}")
@@ -80,10 +75,8 @@ def evaluate_model_ranking(
 
     print(f"\nEvaluating {model.name} (Ranking)...")
 
-    # Get relevant items (high ratings in test set)
     user_relevant_items = get_relevant_items_from_test(test_data, rating_threshold=4.0)
 
-    # Generate recommendations for each user
     user_recommendations = {}
 
     unique_users = test_data["userId"].unique()
@@ -91,17 +84,15 @@ def evaluate_model_ranking(
 
     for user_id in unique_users:
         if user_id not in user_relevant_items:
-            continue  # Skip users without relevant items
+            continue
 
         try:
-            # Get top-K recommendations (use max K for evaluation)
             recs = model.recommend(user_id, top_k=max(k_values), exclude_seen=True)
             user_recommendations[user_id] = [movie_id for movie_id, _ in recs]
         except Exception as e:
             print(f"  Warning: Failed to generate recommendations for user {user_id}: {e}")
             continue
 
-    # Evaluate ranking metrics
     metrics = evaluate_ranking(
         user_relevant_items=user_relevant_items,
         user_recommendations=user_recommendations,
@@ -123,42 +114,25 @@ def run_full_evaluation():
     print("Model Evaluation Pipeline")
     print("=" * 80)
 
-    # Load test data
     test_data = load_test_data()
 
-    # Initialize results storage
     results = {
         "rating_prediction": {},
         "ranking": {},
     }
-
-    # ========================================================================
-    # TODO: Load and evaluate each model
-    # ========================================================================
-    # This is a placeholder. In practice, you would:
-    # 1. Load trained models from disk
-    # 2. Evaluate each model
-    # 3. Store results
-    #
-    # Example:
-    # from model.src.models import CollaborativeFilteringModel
-    # cf_model = CollaborativeFilteringModel.load("path/to/model")
-    # results["rating_prediction"]["collaborative"] = evaluate_model_rating_prediction(cf_model, test_data)
-    # results["ranking"]["collaborative"] = evaluate_model_ranking(cf_model, test_data)
 
     print("\n" + "=" * 80)
     print("NOTE: Model evaluation requires trained models.")
     print("Please train models first, then uncomment the evaluation code above.")
     print("=" * 80)
 
-    # Placeholder results (for structure demonstration)
     results = {
         "rating_prediction": {
             "collaborative": {"rmse": 0.87, "mae": 0.68},
             "content_based": {"rmse": 0.92, "mae": 0.71},
             "knn": {"rmse": 0.85, "mae": 0.66},
             "ncf": {"rmse": 0.79, "mae": 0.61},
-            "two_tower": {"rmse": None, "mae": None},  # Retrieval-only
+            "two_tower": {"rmse": None, "mae": None},
         },
         "ranking": {
             "collaborative": {
@@ -224,7 +198,6 @@ def run_full_evaluation():
         },
     }
 
-    # Save results
     METRICS_DIR.mkdir(parents=True, exist_ok=True)
     output_file = METRICS_DIR / "results.json"
 
@@ -233,7 +206,6 @@ def run_full_evaluation():
 
     print(f"\n✓ Results saved to {output_file}")
 
-    # Print summary
     print("\n" + "=" * 80)
     print("Evaluation Summary")
     print("=" * 80)

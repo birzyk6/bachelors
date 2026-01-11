@@ -63,7 +63,6 @@ class AppUserListSerializer(serializers.ModelSerializer):
         fields = ["id", "movielens_user_id", "display_name", "ratings_count"]
 
     def get_ratings_count(self, obj):
-        # Use annotated field if available (from list view), otherwise count
         return getattr(obj, "rating_count", obj.ratings.count())
 
     def get_display_name(self, obj):
