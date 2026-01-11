@@ -75,3 +75,5 @@ mlflow.db
 mlruns/
 quick_test.sh
 DATA*.md
+
+*.npz
