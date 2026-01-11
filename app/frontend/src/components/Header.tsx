@@ -77,7 +77,7 @@ export default function Header({
                 setSearching(true);
                 try {
                     const data = await api.searchMovies(searchQuery);
-                    setSearchResults(data.results?.slice(0, 8) || []);
+                    setSearchResults(data.results?.slice(0, 20) || []);
                 } catch (error) {
                     console.error("Search failed:", error);
                     setSearchResults([]);

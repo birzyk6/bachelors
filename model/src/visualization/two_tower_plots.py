@@ -670,39 +670,95 @@ def plot_two_tower_similarity_heatmap(
     valid_with_pop = [(mid, title, movie_to_pop.get(mid, 0)) for mid, title in valid_movies]
     valid_with_pop.sort(key=lambda x: x[2], reverse=True)
 
-    # Take top candidates
-    top_candidates = valid_with_pop[: min(100, len(valid_with_pop))]
-    candidate_ids = [x[0] for x in top_candidates]
-    candidate_embeddings = np.array([embeddings_dict[mid] for mid in candidate_ids])
+    # Define iconic movies from different genres to show diversity
+    desired_movies = [
+        # Sci-Fi Action
+        "Star Wars",
+        "Matrix",
+        "Terminator 2",
+        "Blade Runner",
+        # Fantasy/Adventure
+        "Lord of the Rings",
+        "Harry Potter and the Sorcerer",
+        # Animated Family
+        "Toy Story",
+        "Lion King",
+        "Finding Nemo",
+        "Spirited Away",
+        # Classic Drama
+        "Godfather",
+        "Shawshank Redemption",
+        "Forrest Gump",
+        # Thriller/Dark
+        "Dark Knight",
+        "Pulp Fiction",
+        "Inception",
+        "Fight Club",
+        # Horror
+        "Alien",
+        "Shining",
+        # Romance
+        "Titanic",
+        "Notebook",
+        # Comedy
+        "Groundhog Day",
+        "Big Lebowski",
+        "Back to the Future",
+    ]
 
-    # Normalize embeddings
-    norms = np.linalg.norm(candidate_embeddings, axis=1, keepdims=True)
-    normalized = candidate_embeddings / (norms + 1e-8)
+    # Try to find these movies in our dataset
+    selected_movies = []
+    used_ids = set()
 
-    # Compute similarity matrix
-    similarity_matrix = np.dot(normalized, normalized.T)
+    for desired in desired_movies:
+        if len(selected_movies) >= n_movies:
+            break
+        # Search for movie in valid_with_pop
+        for mid, title, pop in valid_with_pop:
+            if isinstance(title, str) and mid not in used_ids and desired.lower() in title.lower():
+                selected_movies.append((mid, title, pop))
+                used_ids.add(mid)
+                print(f"    Found: {title}")
+                break
 
-    # Select diverse movies using greedy selection
-    selected_indices = [0]  # Start with most popular
+    # If we don't have enough, fill with popular diverse movies
+    if len(selected_movies) < n_movies:
+        print(f"    Filling remaining slots with popular movies...")
+        top_candidates = [m for m in valid_with_pop if m[0] not in used_ids][:100]
 
-    for _ in range(n_movies - 1):
-        # Calculate minimum similarity to already selected movies
-        min_sims = []
-        for i in range(len(candidate_ids)):
-            if i not in selected_indices:
-                sims_to_selected = [similarity_matrix[i, j] for j in selected_indices]
-                min_sim = min(sims_to_selected)
-                min_sims.append((i, min_sim))
+        if top_candidates:
+            candidate_ids = [x[0] for x in top_candidates]
+            candidate_embeddings = np.array([embeddings_dict[mid] for mid in candidate_ids])
 
-        # Select the movie with lowest maximum similarity (most diverse)
-        if min_sims:
-            next_idx = min(min_sims, key=lambda x: x[1])[0]
-            selected_indices.append(next_idx)
+            # Normalize embeddings
+            norms = np.linalg.norm(candidate_embeddings, axis=1, keepdims=True)
+            normalized = candidate_embeddings / (norms + 1e-8)
 
-    # Get final selected movies
-    selected_movies = [top_candidates[i] for i in selected_indices]
-    final_ids = [x[0] for x in selected_movies]
-    final_titles = [x[1][:30] for x in selected_movies]
+            # Compute similarity matrix
+            similarity_matrix = np.dot(normalized, normalized.T)
+
+            # Greedy diversity selection
+            selected_from_top = [0]  # Start with most popular unused
+
+            for _ in range(n_movies - len(selected_movies) - 1):
+                min_sims = []
+                for i in range(len(candidate_ids)):
+                    if i not in selected_from_top:
+                        sims_to_selected = [similarity_matrix[i, j] for j in selected_from_top]
+                        min_sim = min(sims_to_selected)
+                        min_sims.append((i, min_sim))
+
+                if min_sims:
+                    next_idx = min(min_sims, key=lambda x: x[1])[0]
+                    selected_from_top.append(next_idx)
+
+            # Add these to selected_movies
+            for idx in selected_from_top:
+                selected_movies.append(top_candidates[idx])
+
+    # Extract final data
+    final_ids = [x[0] for x in selected_movies[:n_movies]]
+    final_titles = [x[1][:30] for x in selected_movies[:n_movies]]
     final_embeddings = np.array([embeddings_dict[mid] for mid in final_ids])
 
     # Compute final similarity matrix
@@ -725,11 +781,12 @@ def plot_two_tower_similarity_heatmap(
         yticklabels=final_titles,
         annot=True,
         fmt=".2f",
-        cmap="YlOrRd",
+        cmap="RdBu_r",
         square=True,
         ax=ax,
-        vmin=0,
+        vmin=-1,
         vmax=1,
+        center=0,
         annot_kws={"size": 8},
         cbar_kws={"label": "Podobieństwo kosinusowe"},
         mask=mask,
