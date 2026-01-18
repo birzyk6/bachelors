@@ -2,7 +2,6 @@
 Train all models sequentially.
 
 This script trains all 5 recommendation models one after another.
-Useful for running overnight or on a remote server.
 """
 
 import subprocess

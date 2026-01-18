@@ -5,8 +5,6 @@ Creates a combined movies.parquet file that includes:
 1. All MovieLens movies (with ratings data)
 2. Additional TMDB movies (for cold-start recommendations)
 
-This enables the CLI to display metadata for all 696K movies.
-
 SAFE: Creates a NEW file, does not overwrite existing movies.parquet.
 """
 
