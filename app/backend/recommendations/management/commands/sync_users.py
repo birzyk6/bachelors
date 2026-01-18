@@ -50,7 +50,6 @@ class Command(BaseCommand):
 
         ratings_path = options.get("ratings_path")
         if not ratings_path:
-            # Try to find ratings file
             for dataset in ["ml-32m", "ml-latest-small"]:
                 path = model_data_path / "raw" / dataset / "ratings.csv"
                 if path.exists():
@@ -77,7 +76,6 @@ class Command(BaseCommand):
         self.stdout.write(f"Loading ratings from: {ratings_path}")
         self.stdout.write(f"Limit users: {limit_str}, Min ratings: {min_ratings}")
 
-        # Load MovieLens to TMDB mapping
         ml_to_tmdb = {}
         if links_path and Path(links_path).exists():
             self.stdout.write(f"Loading ID mappings from: {links_path}")
@@ -90,7 +88,6 @@ class Command(BaseCommand):
                         ml_to_tmdb[movie_id] = int(tmdb_id)
             self.stdout.write(f"Loaded {len(ml_to_tmdb)} movie ID mappings")
 
-        # Count ratings per user
         self.stdout.write("Counting ratings per user...")
         user_rating_counts = {}
         total_ratings = 0
@@ -103,17 +100,14 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Found {len(user_rating_counts)} unique users with {total_ratings} total ratings")
 
-        # Filter users by minimum ratings
         eligible_users = [uid for uid, count in user_rating_counts.items() if count >= min_ratings]
         eligible_users = sorted(eligible_users)
 
-        # Apply limit if specified
         if limit_users > 0:
             eligible_users = eligible_users[:limit_users]
 
         self.stdout.write(f"Selected {len(eligible_users)} eligible users (min {min_ratings} ratings)")
 
-        # Load ratings for eligible users
         self.stdout.write("Loading ratings...")
         user_ratings = {uid: [] for uid in eligible_users}
         eligible_set = set(eligible_users)
@@ -140,7 +134,6 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Loaded {ratings_loaded:,} ratings for import")
 
-        # Import to database in batches
         self.stdout.write("Importing to database...")
 
         users_created = 0
@@ -155,7 +148,6 @@ class Command(BaseCommand):
                     if not user_ratings[user_id]:
                         continue
 
-                    # Create or get user
                     user, created = AppUser.objects.get_or_create(movielens_user_id=user_id, defaults={"is_cold_start": False})
 
                     if created:
@@ -163,7 +155,6 @@ class Command(BaseCommand):
                     else:
                         users_updated += 1
 
-                    # Add ratings (skip existing)
                     existing_tmdb_ids = set(user.ratings.values_list("tmdb_id", flat=True))
 
                     new_ratings = []
@@ -183,7 +174,6 @@ class Command(BaseCommand):
         )
         self.stdout.write(self.style.SUCCESS(f"Created {ratings_created:,} new ratings"))
 
-        # Show stats
         total_users = AppUser.objects.count()
         total_ratings = Rating.objects.count()
         self.stdout.write(f"Total users in DB: {total_users:,}")

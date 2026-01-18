@@ -56,13 +56,11 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         self.dropout_rate = dropout_rate
         self.learning_rate = learning_rate
 
-        # Build model
         self.model = self._build_model()
 
-        # User/movie mappings
-        self.user_id_map = {}  # user_id -> index
-        self.movie_id_map = {}  # movie_id -> index
-        self.reverse_movie_map = {}  # index -> movie_id
+        self.user_id_map = {}
+        self.movie_id_map = {}
+        self.reverse_movie_map = {}
 
         self.train_data = None
         self.user_rated_items = {}
@@ -74,12 +72,9 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         Returns:
             Compiled Keras model
         """
-        # Inputs
         user_input = layers.Input(shape=(1,), name="user_id")
         movie_input = layers.Input(shape=(1,), name="movie_id")
 
-        # ============ GMF Path ============
-        # User embedding for GMF
         gmf_user_embedding = layers.Embedding(
             input_dim=self.num_users,
             output_dim=self.embedding_dim,
@@ -87,7 +82,6 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         )(user_input)
         gmf_user_flat = layers.Flatten()(gmf_user_embedding)
 
-        # Movie embedding for GMF
         gmf_movie_embedding = layers.Embedding(
             input_dim=self.num_movies,
             output_dim=self.embedding_dim,
@@ -95,11 +89,8 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         )(movie_input)
         gmf_movie_flat = layers.Flatten()(gmf_movie_embedding)
 
-        # Element-wise product
         gmf_vector = layers.Multiply()([gmf_user_flat, gmf_movie_flat])
 
-        # ============ MLP Path ============
-        # User embedding for MLP
         mlp_user_embedding = layers.Embedding(
             input_dim=self.num_users,
             output_dim=self.embedding_dim,
@@ -107,7 +98,6 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         )(user_input)
         mlp_user_flat = layers.Flatten()(mlp_user_embedding)
 
-        # Movie embedding for MLP
         mlp_movie_embedding = layers.Embedding(
             input_dim=self.num_movies,
             output_dim=self.embedding_dim,
@@ -115,10 +105,8 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         )(movie_input)
         mlp_movie_flat = layers.Flatten()(mlp_movie_embedding)
 
-        # Concatenate embeddings
         mlp_vector = layers.Concatenate()([mlp_user_flat, mlp_movie_flat])
 
-        # MLP layers
         for i, units in enumerate(self.mlp_layers):
             mlp_vector = layers.Dense(
                 units,
@@ -127,14 +115,10 @@ class NeuralCollaborativeFiltering(BaseRecommender):
             )(mlp_vector)
             mlp_vector = layers.Dropout(self.dropout_rate)(mlp_vector)
 
-        # ============ Fusion Layer ============
-        # Concatenate GMF and MLP outputs
         fusion = layers.Concatenate()([gmf_vector, mlp_vector])
 
-        # Final prediction layer
         output = layers.Dense(1, activation="linear", name="rating")(fusion)
 
-        # Build model
         model = keras.Model(
             inputs=[user_input, movie_input],
             outputs=output,
@@ -189,7 +173,6 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         """
         print(f"Training {self.name} model...")
 
-        # Create ID mappings
         unique_users = sorted(train_data["userId"].unique())
         unique_movies = sorted(train_data["movieId"].unique())
 
@@ -197,17 +180,14 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         self.movie_id_map = {mid: idx for idx, mid in enumerate(unique_movies)}
         self.reverse_movie_map = {idx: mid for mid, idx in self.movie_id_map.items()}
 
-        # Prepare training data
         X_train = {
             "user_id": np.array([self.user_id_map[uid] for uid in train_data["userId"]]),
             "movie_id": np.array([self.movie_id_map[mid] for mid in train_data["movieId"]]),
         }
         y_train = train_data["rating"].values
 
-        # Prepare validation data
         val_data = None
         if validation_data is not None:
-            # Filter validation data to known users/movies
             val_filtered = validation_data[
                 validation_data["userId"].isin(self.user_id_map) & validation_data["movieId"].isin(self.movie_id_map)
             ]
@@ -219,11 +199,9 @@ class NeuralCollaborativeFiltering(BaseRecommender):
             y_val = val_filtered["rating"].values
             val_data = (X_val, y_val)
 
-        # Cache training data
         self.train_data = train_data
         self.user_rated_items = train_data.groupby("userId")["movieId"].apply(set).to_dict()
 
-        # Train
         history = self.model.fit(
             X_train,
             y_train,
@@ -251,27 +229,22 @@ class NeuralCollaborativeFiltering(BaseRecommender):
         if not self.is_fitted:
             raise ValueError("Model must be fitted before calling predict()")
 
-        # Filter to known users/movies
         valid_pairs = user_movie_pairs[
             user_movie_pairs["userId"].isin(self.user_id_map) & user_movie_pairs["movieId"].isin(self.movie_id_map)
         ].copy()
 
         if len(valid_pairs) == 0:
-            return np.full(len(user_movie_pairs), 2.5)  # Default prediction
+            return np.full(len(user_movie_pairs), 2.5)
 
-        # Map to indices
         X = {
             "user_id": np.array([self.user_id_map[uid] for uid in valid_pairs["userId"]]),
             "movie_id": np.array([self.movie_id_map[mid] for mid in valid_pairs["movieId"]]),
         }
 
-        # Predict
         valid_predictions = self.model.predict(X, verbose=0).flatten()
 
-        # Clip to valid rating range
         valid_predictions = np.clip(valid_predictions, 0.5, 5.0)
 
-        # Create full prediction array with default values
         all_predictions = np.full(len(user_movie_pairs), 2.5)
         valid_mask = user_movie_pairs["userId"].isin(self.user_id_map) & user_movie_pairs["movieId"].isin(self.movie_id_map)
         all_predictions[valid_mask] = valid_predictions
@@ -301,31 +274,25 @@ class NeuralCollaborativeFiltering(BaseRecommender):
             raise ValueError("Model must be fitted before calling recommend()")
 
         if user_id not in self.user_id_map:
-            return []  # Cold start user
+            return []
 
-        # Get candidates
         if candidate_movies is None:
             candidate_movies = list(self.movie_id_map.keys())
 
-        # Exclude seen
         if exclude_seen and user_id in self.user_rated_items:
             seen = self.user_rated_items[user_id]
             candidate_movies = [m for m in candidate_movies if m not in seen]
 
-        # Filter to known movies
         candidate_movies = [m for m in candidate_movies if m in self.movie_id_map]
 
         if not candidate_movies:
             return []
 
-        # Create pairs
         user_ids = [user_id] * len(candidate_movies)
         pairs = pd.DataFrame({"userId": user_ids, "movieId": candidate_movies})
 
-        # Predict
         predictions = self.predict(pairs)
 
-        # Sort
         recommendations = list(zip(candidate_movies, predictions))
         recommendations.sort(key=lambda x: x[1], reverse=True)
 
@@ -338,7 +305,6 @@ class NeuralCollaborativeFiltering(BaseRecommender):
 
         self.model.save(path / "ncf_model.keras")
 
-        # Save mappings
         import json
 
         with open(path / "mappings.json", "w") as f:
@@ -358,14 +324,12 @@ class NeuralCollaborativeFiltering(BaseRecommender):
 
         path = Path(path)
 
-        # Load mappings
         with open(path / "mappings.json") as f:
             mappings = json.load(f)
             self.user_id_map = {int(k): int(v) for k, v in mappings["user_id_map"].items()}
             self.movie_id_map = {int(k): int(v) for k, v in mappings["movie_id_map"].items()}
             self.reverse_movie_map = {v: k for k, v in self.movie_id_map.items()}
 
-        # Load Keras model
         self.model = keras.models.load_model(path / "ncf_model.keras")
         self.is_fitted = True
 

@@ -2,7 +2,6 @@
 K-Nearest Neighbors (KNN) Collaborative Filtering.
 
 Item-based KNN using cosine similarity between movies based on user ratings.
-Memory-efficient implementation using scipy sparse matrices.
 """
 
 from pathlib import Path
@@ -47,16 +46,15 @@ class KNNModel(BaseRecommender):
         self.min_support = min_support
         self.max_movies = max_movies
 
-        # Will be set during fit
-        self.item_matrix = None  # Sparse user-item matrix
-        self.user_id_map = {}  # userId -> row index
-        self.item_id_map = {}  # movieId -> col index
-        self.reverse_user_map = {}  # row index -> userId
-        self.reverse_item_map = {}  # col index -> movieId
-        self.neighbor_indices = None  # For each item, indices of k neighbors
-        self.neighbor_sims = None  # For each item, similarities of k neighbors
-        self.item_means = None  # Mean rating per item
-        self.global_mean = 3.5  # Global mean for cold start
+        self.item_matrix = None
+        self.user_id_map = {}
+        self.item_id_map = {}
+        self.reverse_user_map = {}
+        self.reverse_item_map = {}
+        self.neighbor_indices = None
+        self.neighbor_sims = None
+        self.item_means = None
+        self.global_mean = 3.5
 
         self.train_data = None
         self.user_rated_items = {}
@@ -80,7 +78,6 @@ class KNNModel(BaseRecommender):
             print(f"  Data shape: {train_data.shape}")
             print(f"  k={self.k}, similarity={self.similarity}")
 
-        # Filter to top movies by number of ratings for memory efficiency
         movie_counts = train_data["movieId"].value_counts()
         if len(movie_counts) > self.max_movies:
             if verbose:
@@ -90,7 +87,6 @@ class KNNModel(BaseRecommender):
             if verbose:
                 print(f"  Filtered data shape: {train_data.shape}")
 
-        # Create mappings
         unique_users = train_data["userId"].unique()
         unique_items = train_data["movieId"].unique()
 
@@ -105,7 +101,6 @@ class KNNModel(BaseRecommender):
         if verbose:
             print(f"  Building sparse matrix: {n_users:,} users × {n_items:,} items")
 
-        # Build sparse user-item matrix
         row_indices = train_data["userId"].map(self.user_id_map).values
         col_indices = train_data["movieId"].map(self.item_id_map).values
         ratings = train_data["rating"].values
@@ -116,7 +111,6 @@ class KNNModel(BaseRecommender):
             dtype=np.float32,
         )
 
-        # Compute item means
         item_sums = np.array(self.item_matrix.sum(axis=0)).flatten()
         item_counts = np.array((self.item_matrix != 0).sum(axis=0)).flatten()
         self.item_means = np.divide(
@@ -127,17 +121,13 @@ class KNNModel(BaseRecommender):
         if verbose:
             print(f"  Computing similarities in batches (memory-efficient)...")
 
-        # Compute similarity in batches to save memory
-        # Only store top-k neighbors per item
         self.neighbor_indices = np.zeros((n_items, self.k), dtype=np.int32)
         self.neighbor_sims = np.zeros((n_items, self.k), dtype=np.float32)
 
-        # Transpose for item-based (items as rows)
         item_user_matrix = self.item_matrix.T.tocsr()
 
-        # Normalize for cosine similarity
         norms = sparse_norm(item_user_matrix, axis=1)
-        norms[norms == 0] = 1  # Avoid division by zero
+        norms[norms == 0] = 1
         item_user_normed = item_user_matrix.multiply(1 / norms.reshape(-1, 1)).tocsr()
 
         batch_size = 1000
@@ -150,16 +140,13 @@ class KNNModel(BaseRecommender):
             start_idx = batch_idx * batch_size
             end_idx = min((batch_idx + 1) * batch_size, n_items)
 
-            # Compute similarity for this batch against all items
             batch_matrix = item_user_normed[start_idx:end_idx]
             sim_batch = batch_matrix.dot(item_user_normed.T).toarray()
 
-            # For each item in batch, get top-k neighbors (excluding self)
             for i, sim_row in enumerate(sim_batch):
                 item_idx = start_idx + i
-                sim_row[item_idx] = -1  # Exclude self
+                sim_row[item_idx] = -1
 
-                # Get top-k
                 top_k_indices = np.argpartition(sim_row, -self.k)[-self.k :]
                 top_k_indices = top_k_indices[np.argsort(sim_row[top_k_indices])[::-1]]
 
@@ -168,7 +155,6 @@ class KNNModel(BaseRecommender):
 
             gc.collect()
 
-        # Cache training data info
         self.train_data = train_data
         self.user_rated_items = train_data.groupby("userId")["movieId"].apply(set).to_dict()
 
@@ -199,7 +185,6 @@ class KNNModel(BaseRecommender):
             user_id = row["userId"]
             movie_id = row["movieId"]
 
-            # Check if user and item are in training set
             if user_id not in self.user_id_map or movie_id not in self.item_id_map:
                 predictions.append(self.global_mean)
                 continue
@@ -207,14 +192,11 @@ class KNNModel(BaseRecommender):
             user_idx = self.user_id_map[user_id]
             item_idx = self.item_id_map[movie_id]
 
-            # Get user's ratings
             user_ratings = self.item_matrix[user_idx].toarray().flatten()
 
-            # Get neighbors and their similarities
             neighbor_idxs = self.neighbor_indices[item_idx]
             neighbor_sims = self.neighbor_sims[item_idx]
 
-            # Weighted average of neighbor ratings
             numerator = 0.0
             denominator = 0.0
 
@@ -228,7 +210,6 @@ class KNNModel(BaseRecommender):
             else:
                 pred = self.item_means[item_idx]
 
-            # Clamp to rating scale
             pred = max(0.5, min(5.0, pred))
             predictions.append(pred)
 
@@ -256,24 +237,19 @@ class KNNModel(BaseRecommender):
         if not self.is_fitted:
             raise ValueError("Model must be fitted before calling recommend()")
 
-        # Get all movies if not specified
         if candidate_movies is None:
             candidate_movies = list(self.item_id_map.keys())
 
-        # Exclude seen movies
         if exclude_seen and user_id in self.user_rated_items:
             seen_movies = self.user_rated_items[user_id]
             candidate_movies = [m for m in candidate_movies if m not in seen_movies]
 
-        # Predict for all candidates (batch for efficiency)
         pairs_df = pd.DataFrame({"userId": [user_id] * len(candidate_movies), "movieId": candidate_movies})
 
         pred_ratings = self.predict(pairs_df)
 
-        # Create list of (movie_id, rating) tuples
         predictions = list(zip(candidate_movies, pred_ratings))
 
-        # Sort by predicted rating
         predictions.sort(key=lambda x: x[1], reverse=True)
 
         return predictions[:top_k]
@@ -313,7 +289,6 @@ class KNNModel(BaseRecommender):
 
         item_idx = self.item_id_map[item_id]
 
-        # Get precomputed neighbors
         neighbor_idxs = self.neighbor_indices[item_idx][:k]
         neighbor_sims = self.neighbor_sims[item_idx][:k]
 
@@ -331,10 +306,8 @@ class KNNModel(BaseRecommender):
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
-        # Save sparse matrix
         sparse.save_npz(path / "item_matrix.npz", self.item_matrix)
 
-        # Save neighbor data
         np.savez_compressed(
             path / "neighbors.npz",
             indices=self.neighbor_indices,
@@ -342,14 +315,12 @@ class KNNModel(BaseRecommender):
             item_means=self.item_means,
         )
 
-        # Save mappings
         np.savez(
             path / "mappings.npz",
             user_ids=np.array(list(self.user_id_map.keys())),
             item_ids=np.array(list(self.item_id_map.keys())),
         )
 
-        # Save hyperparameters
         with open(path / "params.json", "w") as f:
             json.dump(
                 {
@@ -370,16 +341,13 @@ class KNNModel(BaseRecommender):
 
         path = Path(path)
 
-        # Load sparse matrix
         self.item_matrix = sparse.load_npz(path / "item_matrix.npz")
 
-        # Load neighbor data
         neighbors_data = np.load(path / "neighbors.npz")
         self.neighbor_indices = neighbors_data["indices"]
         self.neighbor_sims = neighbors_data["sims"]
         self.item_means = neighbors_data["item_means"]
 
-        # Load mappings
         mappings = np.load(path / "mappings.npz")
         user_ids = mappings["user_ids"]
         item_ids = mappings["item_ids"]
@@ -389,7 +357,6 @@ class KNNModel(BaseRecommender):
         self.reverse_user_map = {idx: uid for uid, idx in self.user_id_map.items()}
         self.reverse_item_map = {idx: iid for iid, idx in self.item_id_map.items()}
 
-        # Load params
         with open(path / "params.json") as f:
             params = json.load(f)
             self.k = params.get("k", self.k)

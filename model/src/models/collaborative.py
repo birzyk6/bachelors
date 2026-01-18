@@ -46,7 +46,6 @@ class CollaborativeFilteringModel(BaseRecommender):
         self.reg_all = reg_all
         self.random_state = random_state
 
-        # Initialize Surprise SVD model
         self.model = SVD(
             n_factors=n_factors,
             n_epochs=n_epochs,
@@ -56,7 +55,7 @@ class CollaborativeFilteringModel(BaseRecommender):
         )
 
         self.train_data = None
-        self.user_rated_items = {}  # Cache for excluding seen items
+        self.user_rated_items = {}
 
     def fit(self, train_data: pd.DataFrame, verbose: bool = True) -> "CollaborativeFilteringModel":
         """
@@ -74,20 +73,16 @@ class CollaborativeFilteringModel(BaseRecommender):
             print(f"  Data shape: {train_data.shape}")
             print(f"  Factors: {self.n_factors}, Epochs: {self.n_epochs}")
 
-        # Convert to Surprise Dataset format
         reader = Reader(rating_scale=(0.5, 5.0))
         dataset = Dataset.load_from_df(
             train_data[["userId", "movieId", "rating"]],
             reader,
         )
 
-        # Build full trainset
         trainset = dataset.build_full_trainset()
 
-        # Train model
         self.model.fit(trainset)
 
-        # Cache training data for excluding seen items
         self.train_data = train_data
         self.user_rated_items = train_data.groupby("userId")["movieId"].apply(set).to_dict()
 
@@ -144,22 +139,18 @@ class CollaborativeFilteringModel(BaseRecommender):
         if not self.is_fitted:
             raise ValueError("Model must be fitted before calling recommend()")
 
-        # Get all movies if candidates not specified
         if candidate_movies is None:
             candidate_movies = self.train_data["movieId"].unique()
 
-        # Exclude already rated movies
         if exclude_seen and user_id in self.user_rated_items:
             seen_movies = self.user_rated_items[user_id]
             candidate_movies = [m for m in candidate_movies if m not in seen_movies]
 
-        # Predict ratings for all candidates
         predictions = []
         for movie_id in candidate_movies:
             pred = self.model.predict(user_id, movie_id, verbose=False)
             predictions.append((movie_id, pred.est))
 
-        # Sort by predicted rating descending
         predictions.sort(key=lambda x: x[1], reverse=True)
 
         return predictions[:top_k]
@@ -213,15 +204,12 @@ class CollaborativeFilteringModel(BaseRecommender):
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
-        # Save Surprise model
         with open(path / "model.pkl", "wb") as f:
             pickle.dump(self.model, f)
 
-        # Save training data for user_rated_items
         if self.train_data is not None:
             self.train_data.to_parquet(path / "train_data.parquet")
 
-        # Save hyperparameters
         import json
 
         with open(path / "params.json", "w") as f:
@@ -234,17 +222,14 @@ class CollaborativeFilteringModel(BaseRecommender):
 
         path = Path(path)
 
-        # Load Surprise model
         with open(path / "model.pkl", "rb") as f:
             self.model = pickle.load(f)
 
-        # Load training data if available
         train_data_path = path / "train_data.parquet"
         if train_data_path.exists():
             self.train_data = pd.read_parquet(train_data_path)
             self.user_rated_items = self.train_data.groupby("userId")["movieId"].apply(set).to_dict()
 
-        # Load params
         with open(path / "params.json") as f:
             params = json.load(f)
             self.n_factors = params.get("n_factors", self.n_factors)

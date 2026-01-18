@@ -32,15 +32,13 @@ class UserViewSet(viewsets.ModelViewSet):
         from django.core.cache import cache
         from django.db import connection
 
-        # Get pagination params
         page = int(request.query_params.get("page", 1))
-        limit = min(int(request.query_params.get("limit", 50)), 100)  # Max 100 per page
+        limit = min(int(request.query_params.get("limit", 50)), 100)
         search = request.query_params.get("search", "").strip()
         min_ratings = int(request.query_params.get("min_ratings", 0))
         sort_by = request.query_params.get("sort_by", "ratings_count")
         sort_dir = request.query_params.get("sort_dir", "desc")
 
-        # Cache key for this query
         cache_key = f"users_list_{min_ratings}_{sort_by}_{sort_dir}_{search}_{page}_{limit}"
         cached = cache.get(cache_key)
         if cached:
@@ -49,7 +47,6 @@ class UserViewSet(viewsets.ModelViewSet):
         offset = (page - 1) * limit
         order_dir = "DESC" if sort_dir == "desc" else "ASC"
 
-        # Build the search condition
         search_condition = ""
         search_params = []
         if search:
@@ -60,8 +57,6 @@ class UserViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
 
-        # Use raw SQL for maximum performance
-        # This query joins users with aggregated ratings in a single efficient query
         sql = f"""
             SELECT u.id, u.movielens_user_id, u.username, rc.rating_count
             FROM app_users u
@@ -77,7 +72,6 @@ class UserViewSet(viewsets.ModelViewSet):
             LIMIT %s OFFSET %s
         """
 
-        # Count query (cached separately for 5 minutes)
         count_cache_key = f"users_count_{min_ratings}_{search}"
         total = cache.get(count_cache_key)
         if total is None:
@@ -93,14 +87,12 @@ class UserViewSet(viewsets.ModelViewSet):
             with connection.cursor() as cursor:
                 cursor.execute(count_sql, [min_ratings] + search_params)
                 total = cursor.fetchone()[0]
-            cache.set(count_cache_key, total, 300)  # Cache for 5 minutes
+            cache.set(count_cache_key, total, 300)
 
-        # Execute main query
         with connection.cursor() as cursor:
             cursor.execute(sql, [min_ratings] + search_params + [limit, offset])
             rows = cursor.fetchall()
 
-        # Build response data
         users_data = []
         for row in rows:
             user_id, movielens_id, username, rating_count = row
@@ -128,7 +120,6 @@ class UserViewSet(viewsets.ModelViewSet):
             "has_more": offset + limit < total,
         }
 
-        # Cache result for 1 minute
         cache.set(cache_key, result, 60)
 
         return Response(result)
@@ -139,14 +130,11 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = ColdStartUserCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Create user
         user = AppUser.objects.create(is_cold_start=True)
 
-        # Add genre preferences
         for genre in serializer.validated_data.get("genres", []):
             UserPreference.objects.create(user=user, preference_type="genre", preference_value=genre, weight=1.0)
 
-        # Add initial ratings
         for rating_data in serializer.validated_data.get("initial_ratings", []):
             Rating.objects.create(user=user, tmdb_id=rating_data["tmdb_id"], rating=rating_data["rating"])
 
@@ -159,7 +147,6 @@ class UserViewSet(viewsets.ModelViewSet):
 
         user = self.get_object()
 
-        # Pagination params
         page = int(request.query_params.get("page", 1))
         limit = min(int(request.query_params.get("limit", 50)), 100)
         include_movies = request.query_params.get("include_movies", "false").lower() == "true"
@@ -167,14 +154,12 @@ class UserViewSet(viewsets.ModelViewSet):
         ratings = user.ratings.all().order_by("-created_at")
         total = ratings.count()
 
-        # Apply pagination
         offset = (page - 1) * limit
         paginated_ratings = ratings[offset : offset + limit]
 
         serializer = RatingSerializer(paginated_ratings, many=True)
         ratings_data = serializer.data
 
-        # Optionally include movie info
         if include_movies:
             tmdb_ids = [r["tmdb_id"] for r in ratings_data]
             movies = Movie.objects.filter(tmdb_id__in=tmdb_ids)
@@ -269,7 +254,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def statistics(self, request, pk=None):
-        """Get comprehensive statistics for a user based on ALL their ratings."""
+        """Get statistics for a user based on their ratings."""
         import datetime
         from collections import Counter
 
@@ -280,7 +265,6 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         ratings = user.ratings.all()
 
-        # Basic stats
         total_ratings = ratings.count()
         if total_ratings == 0:
             return Response(
@@ -304,41 +288,34 @@ class UserViewSet(viewsets.ModelViewSet):
                 }
             )
 
-        # Aggregate stats
         stats = ratings.aggregate(
             avg_rating=Avg("rating"),
             min_rating=Min("rating"),
             max_rating=Max("rating"),
         )
 
-        # Rating distribution (0.5 to 5.0 in 0.5 increments)
         rating_counts = ratings.values("rating").annotate(count=Count("rating")).order_by("rating")
-        # Create slots for 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0
         rating_values = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
         rating_distribution = [{"rating": str(val), "count": 0} for val in rating_values]
         for rc in rating_counts:
-            # Round to nearest 0.5
             rating_val = round(rc["rating"] * 2) / 2
             if 0.5 <= rating_val <= 5.0:
                 idx = int((rating_val - 0.5) * 2)
                 if 0 <= idx < len(rating_distribution):
                     rating_distribution[idx]["count"] = rc["count"]
 
-        # Get all movie IDs and fetch movie details
         tmdb_ids = list(ratings.values_list("tmdb_id", flat=True))
         movies = Movie.objects.filter(tmdb_id__in=tmdb_ids)
         movies_dict = {m.tmdb_id: m for m in movies}
 
-        # Genre distribution (from all rated movies)
         genre_counter = Counter()
-        genre_ratings = {}  # Track average rating per genre
+        genre_ratings = {}
         decade_counter = Counter()
         years = []
 
         for rating in ratings:
             movie = movies_dict.get(rating.tmdb_id)
             if movie:
-                # Genres
                 if movie.genres:
                     for genre in movie.genres:
                         genre_counter[genre] += 1
@@ -346,14 +323,12 @@ class UserViewSet(viewsets.ModelViewSet):
                             genre_ratings[genre] = []
                         genre_ratings[genre].append(rating.rating)
 
-                # Decades
                 if movie.release_date:
                     year = movie.release_date.year
                     years.append(year)
                     decade = (year // 10) * 10
                     decade_counter[decade] += 1
 
-        # Top 8 genres with average rating
         genre_distribution = [
             {
                 "name": genre,
@@ -363,10 +338,8 @@ class UserViewSet(viewsets.ModelViewSet):
             for genre, count in genre_counter.most_common(8)
         ]
 
-        # Decade distribution
         decade_distribution = [{"decade": f"{decade}s", "count": count} for decade, count in sorted(decade_counter.items())]
 
-        # Monthly activity (last 12 months)
         twelve_months_ago = datetime.datetime.now() - datetime.timedelta(days=365)
         monthly_activity = list(
             ratings.filter(created_at__gte=twelve_months_ago)
@@ -384,7 +357,6 @@ class UserViewSet(viewsets.ModelViewSet):
             for item in monthly_activity
         ]
 
-        # Yearly activity
         yearly_activity = list(
             ratings.annotate(year=ExtractYear("created_at"))
             .values("year")
@@ -400,12 +372,10 @@ class UserViewSet(viewsets.ModelViewSet):
             for item in yearly_activity
         ]
 
-        # Calculate insights (with 0.5-5.0 scale)
-        liked_count = ratings.filter(rating__gte=4).count()  # 4, 4.5, 5
-        disliked_count = ratings.filter(rating__lte=2).count()  # 0.5, 1, 1.5, 2
-        neutral_count = ratings.filter(rating__gt=2, rating__lt=4).count()  # 2.5, 3, 3.5
+        liked_count = ratings.filter(rating__gte=4).count()
+        disliked_count = ratings.filter(rating__lte=2).count()
+        neutral_count = ratings.filter(rating__gt=2, rating__lt=4).count()
 
-        # Rating style analysis
         avg = stats["avg_rating"] or 0
         if avg >= 4:
             rating_style = "Generous Critic"
@@ -416,13 +386,11 @@ class UserViewSet(viewsets.ModelViewSet):
         else:
             rating_style = "Tough Critic"
 
-        # Find favorite genre (most watched with high avg rating)
         favorite_genre = None
         if genre_distribution:
-            # Weight by count and average rating
             best_score = 0
             for g in genre_distribution:
-                if g["count"] >= 5:  # Minimum 5 movies in genre
+                if g["count"] >= 5:
                     score = g["count"] * g["avg_rating"]
                     if score > best_score:
                         best_score = score
@@ -430,21 +398,17 @@ class UserViewSet(viewsets.ModelViewSet):
             if not favorite_genre:
                 favorite_genre = genre_distribution[0]["name"]
 
-        # Average movie year
         avg_movie_year = round(sum(years) / len(years)) if years else None
 
-        # Most active month
         most_active_month = None
         if monthly_activity:
             most_active = max(monthly_activity, key=lambda x: x["count"])
             most_active_month = most_active["month"]
 
-        # Top rated genres
         top_rated_genres = sorted(
             [g for g in genre_distribution if g["count"] >= 3], key=lambda x: x["avg_rating"], reverse=True
         )[:3]
 
-        # Lowest rated genres
         lowest_rated_genres = sorted([g for g in genre_distribution if g["count"] >= 3], key=lambda x: x["avg_rating"])[:3]
 
         return Response(

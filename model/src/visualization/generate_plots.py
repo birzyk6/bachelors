@@ -16,7 +16,6 @@ import seaborn as sns
 from model.src.visualization.plots import plot_ndcg_comparison, plot_recall_at_k, plot_rmse_comparison
 from model.src.visualization.predictions_comparison import plot_model_predictions_comparison
 
-# Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 METRICS_DIR = PROJECT_ROOT / "model" / "metrics"
 PLOTS_DIR = PROJECT_ROOT / "model" / "plots"
@@ -31,7 +30,6 @@ def load_individual_results() -> dict:
         "ranking": {},
     }
 
-    # Model file mapping
     model_files = {
         "collaborative": "collaborative_results.json",
         "content_based": "content_based_results.json",
@@ -46,11 +44,9 @@ def load_individual_results() -> dict:
             with open(filepath) as f:
                 data = json.load(f)
 
-            # Extract metrics
             test_metrics = data.get("test_metrics", {})
             val_metrics = data.get("val_metrics", {})
 
-            # Use test metrics if available, else val metrics
             metrics = test_metrics if test_metrics else val_metrics
 
             if metrics:
@@ -76,7 +72,6 @@ def load_results() -> dict:
         print(f"✓ Loaded combined results from {results_file}")
         return results
 
-    # Fall back to loading individual files
     print("Loading individual model results...")
     return load_individual_results()
 
@@ -89,10 +84,8 @@ def generate_model_comparison_plots(results: dict):
         print("  ⚠ No rating prediction results found, skipping comparison plots")
         return
 
-    # RMSE comparison
     plot_rmse_comparison(results, PLOTS_DIR / "models" / "rmse_comparison.png")
 
-    # NDCG@10 comparison (if ranking results exist)
     if results.get("ranking"):
         plot_ndcg_comparison(results, PLOTS_DIR / "ndcg_comparison.png", k=10)
         plot_recall_at_k(results, PLOTS_DIR / "models" / "recall_at_k.png", k_values=[5, 10, 20])
@@ -125,7 +118,6 @@ def generate_two_tower_plots():
     try:
         import tensorflow as tf
 
-        # Check if embeddings exist
         embeddings_file = SAVED_MODELS_DIR / "movie_embeddings.npy"
         metadata_file = SAVED_MODELS_DIR / "movie_embeddings_metadata.json"
 
@@ -133,18 +125,15 @@ def generate_two_tower_plots():
             print("  ⚠ Two-Tower embeddings not found, skipping Two-Tower plots")
             return
 
-        # Load embeddings (saved as pickled dict) and metadata
         embeddings_dict = np.load(embeddings_file, allow_pickle=True).item()
         with open(metadata_file) as f:
             metadata = json.load(f)
 
         movie_ids = metadata["movie_ids"]
 
-        # Convert dict to array
         embeddings = np.array([embeddings_dict[mid] for mid in movie_ids if mid in embeddings_dict])
         movie_ids = [mid for mid in movie_ids if mid in embeddings_dict]
 
-        # Load movie info
         movie_file = DATA_DIR / "movies.parquet"
         if movie_file.exists():
             movies_df = pl.read_parquet(movie_file).to_pandas()
@@ -152,12 +141,9 @@ def generate_two_tower_plots():
             print("  ⚠ Movies data not found")
             return
 
-        # Create movie id to title mapping (title_ml is the column name)
         title_col = "title_ml" if "title_ml" in movies_df.columns else "title"
         id_to_title = dict(zip(movies_df["movieId"], movies_df[title_col]))
         id_to_genres = dict(zip(movies_df["movieId"], movies_df["genres"]))
-
-        # Two-Tower plots have been moved to model/src/visualization/two_tower_plots.py
 
     except Exception as e:
         print(f"  ✗ Could not generate Two-Tower plots: {e}")
@@ -181,25 +167,19 @@ def generate_all_plots():
     print("Generowanie wykresów do pracy magisterskiej")
     print("=" * 80)
 
-    # Create plots directory structure
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     for subdir in ["eda", "embeddings", "models", "two_tower", "recommender"]:
         (PLOTS_DIR / subdir).mkdir(exist_ok=True)
 
-    # Load results
     results = load_results()
 
     if results:
-        # Generate comparison plots
         generate_model_comparison_plots(results)
 
-    # Generate model predictions comparison
     generate_model_predictions_plot()
 
-    # Generate Two-Tower specific plots
     generate_two_tower_plots()
 
-    # Try to generate new modular plots
     try:
         from model.src.visualization.eda_plots import generate_all_eda_plots
 
@@ -247,7 +227,6 @@ def generate_all_plots():
     print(f"✓ Wszystkie wykresy zapisane w {PLOTS_DIR}")
     print("=" * 80)
 
-    # List generated plots
     print("\nWygenerowane wykresy:")
     for subdir in ["", "eda", "embeddings", "models", "two_tower", "recommender"]:
         dir_path = PLOTS_DIR / subdir if subdir else PLOTS_DIR

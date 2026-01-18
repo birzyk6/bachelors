@@ -35,58 +35,45 @@ from umap import UMAP
 
 from .plots import set_thesis_style
 
-# Polish labels for dimensionality reduction methods
 METHOD_LABELS = {
     "tsne": {"dim1": "t-SNE wymiar 1", "dim2": "t-SNE wymiar 2", "name": "t-SNE"},
     "pca": {"dim1": "PCA składowa 1", "dim2": "PCA składowa 2", "name": "PCA"},
     "umap": {"dim1": "UMAP wymiar 1", "dim2": "UMAP wymiar 2", "name": "UMAP"},
 }
 
-# Dataset labels
 DATASET_LABELS = {
     "rated": "80K filmów z ocenami",
     "tmdb": "650K filmów TMDB (cały zbiór)",
 }
 
-# Vibrant rainbow colormap for scatter plots
 COLORMAP = "rainbow"
 
-# Genre colors - grouped by theme with similar colors for related genres
 GENRE_COLORS = {
-    # Action/Adventure/Thriller family - Reds to Oranges
-    "Action": "#FF5722",  # Deep orange
-    "Adventure": "#FF9800",  # Orange
-    "Thriller": "#F44336",  # Red
-    # Drama/Crime/Mystery family - Deep blues to Purples
-    "Drama": "#3F51B5",  # Indigo
-    "Crime": "#283593",  # Dark indigo
-    "Mystery": "#5E35B1",  # Deep purple
-    "Film-Noir": "#1A237E",  # Very dark blue
-    # Comedy/Family/Children family - Yellows to Light colors
-    "Comedy": "#FFEB3B",  # Yellow
-    "Family": "#FFC107",  # Amber
-    "Children": "#FFD54F",  # Light amber
-    # Sci-Fi/Fantasy family - Greens to Teals
-    "Sci-Fi": "#00BCD4",  # Cyan
-    "Science Fiction": "#00BCD4",  # Cyan (TMDB equivalent)
-    "Fantasy": "#009688",  # Teal
-    "IMAX": "#00ACC1",  # Light cyan
-    # Romance/Musical family - Pinks
-    "Romance": "#E91E63",  # Pink
-    "Musical": "#F06292",  # Light pink
-    "Music": "#F06292",  # Light pink (TMDB equivalent)
-    # Horror - Dark purple
-    "Horror": "#4A148C",  # Very dark purple
-    # Animation - Bright magenta
-    "Animation": "#FF4081",  # Bright pink/magenta
-    # Documentary/History/War family - Grays to Browns
-    "Documentary": "#607D8B",  # Blue gray
-    "History": "#795548",  # Brown
-    "War": "#5D4037",  # Dark brown
-    "Western": "#8D6E63",  # Light brown
-    "TV Movie": "#78909C",  # Light blue gray
-    # Other/Unknown
-    "Other": "#9E9E9E",  # Gray
+    "Action": "#FF5722",
+    "Adventure": "#FF9800",
+    "Thriller": "#F44336",
+    "Drama": "#3F51B5",
+    "Crime": "#283593",
+    "Mystery": "#5E35B1",
+    "Film-Noir": "#1A237E",
+    "Comedy": "#FFEB3B",
+    "Family": "#FFC107",
+    "Children": "#FFD54F",
+    "Sci-Fi": "#00BCD4",
+    "Science Fiction": "#00BCD4",
+    "Fantasy": "#009688",
+    "IMAX": "#00ACC1",
+    "Romance": "#E91E63",
+    "Musical": "#F06292",
+    "Music": "#F06292",
+    "Horror": "#4A148C",
+    "Animation": "#FF4081",
+    "Documentary": "#607D8B",
+    "History": "#795548",
+    "War": "#5D4037",
+    "Western": "#8D6E63",
+    "TV Movie": "#78909C",
+    "Other": "#9E9E9E",
 }
 
 
@@ -120,11 +107,6 @@ def get_all_genres(genres_str: str) -> List[str]:
     return []
 
 
-# =============================================================================
-# CLUSTER EVALUATION FUNCTIONS
-# =============================================================================
-
-
 def get_or_calculate_optimal_k(
     embeddings: np.ndarray,
     cache_file: Path,
@@ -146,25 +128,22 @@ def get_or_calculate_optimal_k(
 
     print(f"  Obliczanie optymalnej liczby klastrów...")
 
-    # Generate elbow plot
     plot_elbow_method(
         embeddings,
         output_dir / f"{dataset_name}_elbow.png",
         max_k=max_k,
     )
 
-    # Generate silhouette plot and get optimal k
     optimal_k = plot_silhouette_method(
         embeddings,
         output_dir / f"{dataset_name}_silhouette.png",
         max_k=max_k,
     )
 
-    # Save optimal k for future use
     cache_data = {
         "optimal_k": optimal_k,
         "max_k_tested": max_k,
-        "silhouette_score": float("NaN"),  # Will be updated in plot_silhouette_method
+        "silhouette_score": float("NaN"),
         "dataset_name": dataset_name,
     }
 
@@ -225,7 +204,6 @@ def plot_silhouette_method(
     silhouette_scores = []
     k_range = range(2, max_k + 1)
 
-    # Use larger sample for more reliable scores
     sample_size = min(30000, len(embeddings))
 
     for k in k_range:
@@ -235,17 +213,15 @@ def plot_silhouette_method(
         silhouette_scores.append(score)
         print(f"    k={k}: silhouette={score:.4f}")
 
-    # Find best k - look for first significant local maximum in reasonable range (3-15)
     best_k_idx = 0
     max_score_in_range = -1
 
     for i, k in enumerate(k_range):
-        if 3 <= k <= 15:  # Focus on reasonable range
+        if 3 <= k <= 15:
             if silhouette_scores[i] > max_score_in_range:
                 max_score_in_range = silhouette_scores[i]
                 best_k_idx = i
 
-    # If no good solution in range, use absolute maximum
     if max_score_in_range == -1:
         best_k_idx = np.argmax(silhouette_scores)
 
@@ -268,7 +244,6 @@ def plot_silhouette_method(
     print(f"  ✓ Zapisano wykres metody sylwetkowej do {output_path.name}")
     print(f"  ✓ Najlepsza liczba klastrów: k={best_k} (wynik={best_score:.4f})")
 
-    # Update cache file with silhouette score if it exists
     cache_file = output_path.parent / f"{output_path.stem.replace('_silhouette', '')}_optimal_k.json"
     if cache_file.exists():
         try:
@@ -279,11 +254,6 @@ def plot_silhouette_method(
                 json.dump(cache_data, f, indent=2)
         except Exception:
             pass
-
-
-# =============================================================================
-# PRECOMPUTATION FUNCTIONS
-# =============================================================================
 
 
 def precompute_dimensionality_reductions(
@@ -299,7 +269,6 @@ def precompute_dimensionality_reductions(
 
     Returns dict with keys: 'tsne', 'pca', 'umap', and optionally 'umap_supervised'
     """
-    # Load existing cache if available
     results = {}
     cache_updated = False
 
@@ -308,7 +277,6 @@ def precompute_dimensionality_reductions(
         with open(cache_file, "rb") as f:
             results = pickle.load(f)
 
-        # Check if we need to add supervised UMAP
         if genre_labels is not None and "umap_supervised" not in results:
             print(f"  Obliczanie nadzorowanej UMAP...")
             print(f"    - UMAP (nadzorowany - z etykietami gatunków)...")
@@ -319,7 +287,6 @@ def precompute_dimensionality_reductions(
         elif "umap_supervised" in results:
             print(f"  ✓ Nadzorowana UMAP już obliczona")
 
-        # Update cache if needed
         if cache_updated:
             print(f"  💾 Aktualizacja cache: {cache_file}")
             with open(cache_file, "wb") as f:
@@ -327,46 +294,35 @@ def precompute_dimensionality_reductions(
 
         return results
 
-    # Compute all reductions from scratch
     print(f"  Obliczanie redukcji wymiarów dla {len(embeddings):,} osadzeń...")
 
-    # t-SNE
     print(f"    - t-SNE (może potrwać kilka minut)...")
     tsne = TSNE(n_components=2, perplexity=50, random_state=42, max_iter=1000)
     results["tsne"] = tsne.fit_transform(embeddings)
     print(f"      ✓ t-SNE gotowe")
 
-    # PCA
     print(f"    - PCA...")
     pca = PCA(n_components=2, random_state=42)
     results["pca"] = pca.fit_transform(embeddings)
     print(f"      ✓ PCA gotowe")
 
-    # UMAP (unsupervised)
     print(f"    - UMAP (nienadzorowany)...")
     umap = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1)
     results["umap"] = umap.fit_transform(embeddings)
     print(f"      ✓ UMAP gotowe")
 
-    # Supervised UMAP (if genre labels provided)
     if genre_labels is not None:
         print(f"    - UMAP (nadzorowany - z etykietami gatunków)...")
         umap_supervised = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1, metric="cosine")
         results["umap_supervised"] = umap_supervised.fit_transform(embeddings, y=genre_labels)
         print(f"      ✓ UMAP nadzorowany gotowy")
 
-    # Save to cache
     print(f"  💾 Zapisywanie do cache: {cache_file}")
     cache_file.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_file, "wb") as f:
         pickle.dump(results, f)
 
     return results
-
-
-# =============================================================================
-# DATA LOADING FUNCTIONS
-# =============================================================================
 
 
 def load_rated_movies_data(
@@ -381,7 +337,6 @@ def load_rated_movies_data(
 
     Returns: embeddings, movie_ids, metadata_dict
     """
-    # Load embeddings
     embeddings_dict = np.load(embeddings_file, allow_pickle=True).item()
     with open(metadata_file) as f:
         metadata = json.load(f)
@@ -390,12 +345,10 @@ def load_rated_movies_data(
     valid_ids = [mid for mid in movie_ids if mid in embeddings_dict]
     embeddings = np.array([embeddings_dict[mid] for mid in valid_ids])
 
-    # Create metadata
     title_col = "title_ml" if "title_ml" in movies_df.columns else "title"
     id_to_title = dict(zip(movies_df["movieId"], movies_df[title_col]))
     id_to_genres = dict(zip(movies_df["movieId"], movies_df["genres"]))
 
-    # Popularity from TMDB if available
     id_to_tmdb_pop = {}
     if "popularity" in movies_df.columns:
         id_to_tmdb_pop = dict(zip(movies_df["movieId"], movies_df["popularity"].fillna(0)))
@@ -421,20 +374,16 @@ def load_tmdb_data(
 
     Returns: embeddings, movie_ids, metadata_dict
     """
-    # Load TMDB embeddings
     tmdb_data = np.load(tmdb_file, allow_pickle=True)
     embeddings = tmdb_data["embeddings"]
     movie_ids = list(tmdb_data["movie_ids"])
 
-    # Load TMDB CSV for better metadata coverage
     tmdb_csv_path = tmdb_file.parent.parent / "data" / "raw" / "tmdb" / "TMDB_movie_dataset_v11.csv"
     print(f"  Ładowanie metadanych TMDB z {tmdb_csv_path.name}...")
     tmdb_csv = pd.read_csv(tmdb_csv_path)
 
-    # Create lookup dictionaries from TMDB CSV
     id_to_title = dict(zip(tmdb_csv["id"], tmdb_csv["title"]))
 
-    # Convert TMDB genre format (comma-separated) to pipe-separated for consistency
     def convert_genres(genre_str):
         if pd.isna(genre_str) or genre_str == "":
             return "(no genres listed)"
@@ -443,14 +392,12 @@ def load_tmdb_data(
     id_to_genres = {row["id"]: convert_genres(row["genres"]) for _, row in tmdb_csv.iterrows()}
     id_to_tmdb_pop = dict(zip(tmdb_csv["id"], tmdb_csv["popularity"].fillna(0)))
 
-    # Extract primary genre for each movie (for supervised learning)
     primary_genres = []
     for movie_id in movie_ids:
         genres_str = id_to_genres.get(movie_id, "(no genres listed)")
         if genres_str == "(no genres listed)":
             primary_genres.append("Other")
         else:
-            # Take first genre as primary
             first_genre = genres_str.split("|")[0]
             primary_genres.append(first_genre)
 
@@ -465,11 +412,6 @@ def load_tmdb_data(
     }
 
     return embeddings, movie_ids, metadata_dict
-
-
-# =============================================================================
-# PLOTTING FUNCTIONS
-# =============================================================================
 
 
 def plot_method_comparison(
@@ -490,7 +432,6 @@ def plot_method_comparison(
 
     n_points = len(reductions["tsne"])
 
-    # Get average ratings if available
     color_data = None
     cmap_name = COLORMAP
     vmin, vmax = None, None
@@ -499,25 +440,20 @@ def plot_method_comparison(
     if metadata and "id_to_avg_rating" in metadata:
         movie_ids = metadata["movie_ids"]
         avg_ratings = [metadata["id_to_avg_rating"].get(mid, 0) for mid in movie_ids]
-        # Filter out zeros (movies without ratings)
         color_data = np.array(avg_ratings)
-        # Replace zeros with NaN for better visualization
         color_data = np.where(color_data > 0, color_data, np.nan)
-        cmap_name = "RdYlGn"  # Red (low) to Yellow to Green (high) - intuitive for ratings
+        cmap_name = "RdYlGn"
         vmin, vmax = 0.5, 5.0
         cbar_label = "Średnia ocena"
     else:
-        # Fallback to sequential coloring
         color_data = np.arange(n_points)
 
     for ax, method in zip(axes, methods):
         coords = reductions[method]
         labels = METHOD_LABELS[method]
 
-        # Adjust alpha for more vibrant colors
         alpha = 0.3 if n_points > 100000 else 0.5 if n_points > 50000 else 0.8
 
-        # Plot
         scatter = ax.scatter(
             coords[:, 0],
             coords[:, 1],
@@ -535,7 +471,6 @@ def plot_method_comparison(
         ax.set_title(labels["name"], fontweight="bold", fontsize=13)
         ax.grid(alpha=0.2)
 
-        # Add individual colorbar on the left with bigger margin
         if cbar_label:
             cbar = plt.colorbar(scatter, ax=ax, orientation="vertical", pad=0.1, aspect=20)
             cbar.set_label(cbar_label, fontweight="bold", fontsize=10)
@@ -568,13 +503,11 @@ def plot_with_genres(
     """
     set_thesis_style()
 
-    # Get primary genre for each movie
     genres = []
     for mid in metadata["movie_ids"]:
         genre_str = metadata["id_to_genres"].get(mid, "")
         genres.append(get_primary_genre(genre_str))
 
-    # Get unique genres and assign colors
     genres_array = np.array(genres)
     unique_genres = sorted(set(genres))
     genre_to_color = {g: GENRE_COLORS.get(g, GENRE_COLORS["Other"]) for g in unique_genres}
@@ -586,7 +519,6 @@ def plot_with_genres(
         coords = reductions[method]
         labels = METHOD_LABELS[method]
 
-        # Plot "Other" first as background with low alpha
         if "Other" in unique_genres:
             mask = genres_array == "Other"
             ax.scatter(
@@ -599,7 +531,6 @@ def plot_with_genres(
                 rasterized=True,
             )
 
-        # Plot each main genre separately for legend (higher visibility)
         main_genres = [g for g in unique_genres if g != "Other"]
         for genre in main_genres:
             mask = genres_array == genre
@@ -656,18 +587,15 @@ def plot_with_top_genres(
     """
     set_thesis_style()
 
-    # Get primary genre for each movie
     genres = []
     for mid in metadata["movie_ids"]:
         genre_str = metadata["id_to_genres"].get(mid, "")
         genres.append(get_primary_genre(genre_str))
 
-    # Count genres and get top N (excluding "Other")
     from collections import Counter
 
     genre_counts = Counter(genres)
 
-    # Get top N genres (excluding "Other")
     top_genres = [g for g, count in genre_counts.most_common() if g != "Other"][:top_n]
 
     genres_array = np.array(genres)
@@ -675,16 +603,13 @@ def plot_with_top_genres(
     methods = ["tsne", "pca", "umap"]
 
     for method in methods:
-        # Create 3x3 grid
         fig, axes = plt.subplots(3, 3, figsize=(20, 20))
         axes = axes.flatten()
 
         coords = reductions[method]
         labels = METHOD_LABELS[method]
 
-        # Plot each genre in a separate subplot
         for idx, (ax, genre) in enumerate(zip(axes, top_genres)):
-            # Plot all movies as gray background
             ax.scatter(
                 coords[:, 0],
                 coords[:, 1],
@@ -694,7 +619,6 @@ def plot_with_top_genres(
                 rasterized=True,
             )
 
-            # Highlight the current genre
             mask = genres_array == genre
             genre_count = mask.sum()
 
@@ -747,7 +671,6 @@ def plot_density_maps(
         coords = reductions[method]
         labels = METHOD_LABELS[method]
 
-        # Create hexbin density plot with rainbow colors
         hb = ax.hexbin(
             coords[:, 0],
             coords[:, 1],
@@ -756,7 +679,6 @@ def plot_density_maps(
             mincnt=1,
         )
 
-        # Colorbar
         cb = plt.colorbar(hb, ax=ax, label="Liczba filmów")
         cb.ax.tick_params(labelsize=10)
 
@@ -796,16 +718,13 @@ def plot_supervised_umap(
     coords = reductions["umap_supervised"]
     genres_array = metadata["primary_genre"]
 
-    # Count genre frequencies
     unique_genres, counts = np.unique(genres_array, return_counts=True)
     genre_counts = dict(zip(unique_genres, counts))
     top_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:9]
     top_genre_names = [g for g, _ in top_genres]
 
-    # Plot 1: All genres colored
     fig, ax = plt.subplots(figsize=(14, 10))
 
-    # Plot "Other" genres in background
     other_mask = ~np.isin(genres_array, top_genre_names)
     if other_mask.sum() > 0:
         ax.scatter(
@@ -819,7 +738,6 @@ def plot_supervised_umap(
             label=f"Other ({other_mask.sum():,})",
         )
 
-    # Plot main genres on top
     genre_to_color = {g: GENRE_COLORS.get(g, "#808080") for g in top_genre_names}
 
     for genre in top_genre_names:
@@ -861,14 +779,12 @@ def plot_supervised_umap(
     plt.close()
     print(f"  ✓ Zapisano nadzorowaną UMAP (wszystkie gatunki) do {output_path.name}")
 
-    # Plot 2: Top 9 genres in 3x3 grid
     fig, axes = plt.subplots(3, 3, figsize=(18, 16))
     axes = axes.flatten()
 
     for idx, (genre, count) in enumerate(top_genres):
         ax = axes[idx]
 
-        # Background: all other movies
         other_mask = genres_array != genre
         ax.scatter(
             coords[other_mask, 0],
@@ -880,7 +796,6 @@ def plot_supervised_umap(
             rasterized=True,
         )
 
-        # Foreground: this genre
         genre_mask = genres_array == genre
         ax.scatter(
             coords[genre_mask, 0],
@@ -916,11 +831,6 @@ def plot_supervised_umap(
     print(f"  ✓ Zapisano nadzorowaną UMAP (top-9 grid) do {output_path.name}")
 
 
-# =============================================================================
-# MAIN ORCHESTRATION FUNCTIONS
-# =============================================================================
-
-
 def generate_plots_for_dataset(
     embeddings: np.ndarray,
     metadata: Dict,
@@ -943,20 +853,16 @@ def generate_plots_for_dataset(
     print(f"Generowanie wykresów dla: {dataset_label}")
     print(f"{'='*80}")
 
-    # Prepare genre labels for supervised learning (TMDB only)
     genre_labels = None
     if dataset_name == "tmdb" and "primary_genre" in metadata:
-        # Encode genre strings to integers for UMAP
         from sklearn.preprocessing import LabelEncoder
 
         le = LabelEncoder()
         genre_labels = le.fit_transform(metadata["primary_genre"])
         print(f"  ✓ Przygotowano etykiety gatunków dla nadzorowanej UMAP ({len(np.unique(genre_labels))} unikalnych gatunków)")
 
-    # Precompute dimensionality reductions
     reductions = precompute_dimensionality_reductions(embeddings, cache_file, dataset_name, genre_labels=genre_labels)
 
-    # 1. Comparison plot
     print(f"\n  [1/4] Porównanie metod...")
     plot_method_comparison(
         reductions,
@@ -965,19 +871,15 @@ def generate_plots_for_dataset(
         metadata,
     )
 
-    # 2. Genre plots
     print(f"\n  [2/4] Wykresy z gatunkami...")
     plot_with_genres(reductions, metadata, output_dir, dataset_label)
 
-    # 3. Top 9 genres plots
     print(f"\n  [3/4] Wykresy z top-9 gatunkami...")
     plot_with_top_genres(reductions, metadata, output_dir, dataset_label, top_n=9)
 
-    # 4. Density maps
     print(f"\n  [4/4] Mapy gęstości...")
     plot_density_maps(reductions, output_dir, dataset_label)
 
-    # 5. Supervised UMAP plots (if available)
     if "umap_supervised" in reductions:
         print(f"\n  [5/5] Nadzorowana UMAP (z etykietami gatunków)...")
         plot_supervised_umap(reductions, metadata, output_dir, dataset_label)
@@ -1011,69 +913,54 @@ def plot_cosine_similarity_heatmap(
     movie_ids = metadata["movie_ids"]
     id_to_title = metadata["id_to_title"]
 
-    # Get popularity scores if available
     if "id_to_tmdb_pop" in metadata and metadata["id_to_tmdb_pop"]:
         popularity = [metadata["id_to_tmdb_pop"].get(mid, 0) for mid in movie_ids]
     elif "id_to_rating_count" in metadata:
         popularity = [metadata["id_to_rating_count"].get(mid, 0) for mid in movie_ids]
     else:
-        # Use simple index as popularity
         popularity = list(range(len(movie_ids)))
 
-    # Filter for popular movies with valid embeddings
     valid_movies = [
         (i, movie_ids[i], id_to_title.get(movie_ids[i], f"Film {movie_ids[i]}"), popularity[i])
         for i in range(len(movie_ids))
         if i < len(embeddings)
     ]
 
-    # Sort by popularity and take top candidates
     valid_movies.sort(key=lambda x: x[3], reverse=True)
 
-    # Define iconic movies from different genres to show diversity
     desired_movies = [
-        # Sci-Fi Action
         "Star Wars",
         "Matrix",
         "Terminator 2",
         "Blade Runner",
-        # Fantasy/Adventure
         "Lord of the Rings",
         "Harry Potter and the Sorcerer",
-        # Animated Family
         "Toy Story",
         "Lion King",
         "Finding Nemo",
         "Spirited Away",
-        # Classic Drama
         "Godfather",
         "Shawshank Redemption",
         "Forrest Gump",
-        # Thriller/Dark
         "Dark Knight",
         "Pulp Fiction",
         "Inception",
         "Fight Club",
-        # Horror
         "Alien",
         "Shining",
-        # Romance
         "Titanic",
         "Notebook",
-        # Comedy
         "Groundhog Day",
         "Big Lebowski",
         "Back to the Future",
     ]
 
-    # Try to find these movies in our dataset
     selected_movies = []
     used_indices = set()
 
     for desired in desired_movies:
         if len(selected_movies) >= n_movies:
             break
-        # Search for movie in valid_movies
         for i, mid, title, pop in valid_movies:
             if isinstance(title, str) and i not in used_indices and desired.lower() in title.lower():
                 selected_movies.append((i, mid, title, pop))
@@ -1081,7 +968,6 @@ def plot_cosine_similarity_heatmap(
                 print(f"    Found: {title}")
                 break
 
-    # If we don't have enough, fill with popular diverse movies
     if len(selected_movies) < n_movies:
         print(f"    Filling remaining slots with popular movies...")
         top_candidates = [m for m in valid_movies if m[0] not in used_indices][:100]
@@ -1090,15 +976,12 @@ def plot_cosine_similarity_heatmap(
             candidate_indices = [x[0] for x in top_candidates]
             candidate_embeddings = embeddings[candidate_indices]
 
-            # Normalize embeddings
             norms = np.linalg.norm(candidate_embeddings, axis=1, keepdims=True)
             normalized = candidate_embeddings / (norms + 1e-8)
 
-            # Compute similarity matrix
             similarity_matrix = np.dot(normalized, normalized.T)
 
-            # Greedy diversity selection
-            selected_from_top = [0]  # Start with most popular unused
+            selected_from_top = [0]
 
             for _ in range(n_movies - len(selected_movies) - 1):
                 min_sims = []
@@ -1112,27 +995,21 @@ def plot_cosine_similarity_heatmap(
                     next_idx = min(min_sims, key=lambda x: x[1])[0]
                     selected_from_top.append(next_idx)
 
-            # Add these to selected_movies
             for idx in selected_from_top:
                 selected_movies.append(top_candidates[idx])
 
-    # Extract final data
     final_indices = [x[0] for x in selected_movies[:n_movies]]
     final_embeddings = embeddings[final_indices]
     final_titles = [x[2][:30] for x in selected_movies[:n_movies]]
 
-    # Compute final similarity matrix
     norms = np.linalg.norm(final_embeddings, axis=1, keepdims=True)
     normalized = final_embeddings / (norms + 1e-8)
     similarity_matrix = np.dot(normalized, normalized.T)
 
-    # Create lower triangular mask (k=1 to show diagonal)
     mask = np.triu(np.ones_like(similarity_matrix, dtype=bool), k=1)
 
-    # Plot
     fig, ax = plt.subplots(figsize=(12, 10))
 
-    # Use masked array for lower triangle + diagonal
     masked_sim = np.ma.array(similarity_matrix, mask=mask)
 
     sns.heatmap(
@@ -1154,7 +1031,6 @@ def plot_cosine_similarity_heatmap(
         linecolor="none",
     )
 
-    # Remove grid
     ax.grid(False)
 
     ax.set_title(
@@ -1196,7 +1072,6 @@ def generate_all_embedding_plots(
     print("GENEROWANIE WYKRESÓW WIZUALIZACJI OSADZEŃ")
     print("=" * 80)
 
-    # Create output directories
     emb_dir = output_dir / "embeddings"
     emb_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1209,7 +1084,6 @@ def generate_all_embedding_plots(
     cache_dir = saved_models_dir / "reduction_cache"
     cache_dir.mkdir(exist_ok=True)
 
-    # Load movie metadata
     movies_file = data_dir / "movies.parquet"
     if not movies_file.exists():
         print(f"⚠ Nie znaleziono pliku filmów: {movies_file}")
@@ -1218,7 +1092,6 @@ def generate_all_embedding_plots(
     movies_df = pl.read_parquet(movies_file).to_pandas()
     print(f"\n✓ Załadowano {len(movies_df):,} filmów z metadanymi")
 
-    # Load rating statistics
     train_file = data_dir / "train.parquet"
     rating_counts = {}
     avg_ratings = {}
@@ -1230,9 +1103,6 @@ def generate_all_embedding_plots(
         avg_ratings = dict(avgs.iter_rows())
         print(f"✓ Załadowano statystyki ocen dla {len(rating_counts):,} filmów")
 
-    # =========================================================================
-    # DATASET 1: 80K Movies with Ratings
-    # =========================================================================
     embeddings_file = saved_models_dir / "movie_embeddings.npy"
     metadata_file = saved_models_dir / "movie_embeddings_metadata.json"
 
@@ -1260,7 +1130,6 @@ def generate_all_embedding_plots(
             DATASET_LABELS["rated"],
         )
 
-        # Generate cosine similarity heatmap
         plot_cosine_similarity_heatmap(
             embeddings,
             metadata,
@@ -1271,9 +1140,6 @@ def generate_all_embedding_plots(
     else:
         print(f"\n⚠ Nie znaleziono osadzeń Two-Tower")
 
-    # =========================================================================
-    # DATASET 2: All TMDB Movies
-    # =========================================================================
     tmdb_file = saved_models_dir / "tmdb_movie_embeddings.npz"
 
     if tmdb_file.exists():
@@ -1297,7 +1163,6 @@ def generate_all_embedding_plots(
             DATASET_LABELS["tmdb"],
         )
 
-        # Generate cosine similarity heatmap
         plot_cosine_similarity_heatmap(
             embeddings,
             metadata,

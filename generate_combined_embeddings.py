@@ -18,12 +18,10 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import MODELS_DIR
 
-# Output paths (NEW files - won't overwrite anything)
 COMBINED_EMBEDDINGS_PATH = MODELS_DIR / "combined_movie_embeddings.npy"
 COMBINED_METADATA_PATH = MODELS_DIR / "combined_movie_embeddings_metadata.json"
 TMDB_BERT_MERGED_PATH = MODELS_DIR / "tmdb_bert_embeddings.npz"
@@ -65,18 +63,15 @@ def merge_tmdb_chunks() -> bool:
         del data
         gc.collect()
 
-    # Concatenate
     embeddings = np.vstack(all_embeddings)
     movie_ids = np.concatenate(all_movie_ids)
 
-    # Free memory
     del all_embeddings, all_movie_ids
     gc.collect()
 
     print(f"\nTotal: {len(movie_ids):,} TMDB movies with BERT embeddings")
     print(f"Embedding shape: {embeddings.shape}")
 
-    # Save merged file
     np.savez_compressed(
         TMDB_BERT_MERGED_PATH,
         embeddings=embeddings,
@@ -100,7 +95,6 @@ def generate_tmdb_movie_embeddings() -> bool:
         print(f"✓ TMDB movie embeddings already exist: {TMDB_MOVIE_EMBEDDINGS_PATH}")
         return True
 
-    # Check prerequisites
     content_tower_path = MODELS_DIR / "content_only_tower"
     if not content_tower_path.exists():
         print(f"✗ Content-only tower not found: {content_tower_path}")
@@ -111,19 +105,16 @@ def generate_tmdb_movie_embeddings() -> bool:
         print(f"✗ TMDB BERT embeddings not found: {TMDB_BERT_MERGED_PATH}")
         return False
 
-    # Load content-only tower
     print("\nLoading content-only tower...")
     content_tower = tf.keras.models.load_model(content_tower_path)
     print("✓ Content-only tower loaded")
 
-    # Load TMDB BERT embeddings
     print(f"\nLoading TMDB BERT embeddings from {TMDB_BERT_MERGED_PATH}...")
     tmdb_data = np.load(TMDB_BERT_MERGED_PATH)
     bert_embeddings = tmdb_data["embeddings"]
     movie_ids = tmdb_data["movie_ids"]
     print(f"  Loaded {len(movie_ids):,} movies")
 
-    # Generate movie embeddings in batches
     print("\nGenerating movie embeddings (content-only tower)...")
     batch_size = 1024
     all_embeddings = []
@@ -133,26 +124,21 @@ def generate_tmdb_movie_embeddings() -> bool:
         batch = bert_embeddings[i : i + batch_size]
         batch_num = i // batch_size + 1
 
-        # Use content-only tower (takes BERT embedding as input)
         emb = content_tower.predict(batch, verbose=0)
         all_embeddings.append(emb)
 
         if batch_num % 100 == 0 or batch_num == num_batches:
             print(f"  Batch {batch_num}/{num_batches} ({i + len(batch):,}/{len(bert_embeddings):,})")
 
-        # Garbage collection every 500 batches
         if batch_num % 500 == 0:
             gc.collect()
 
-    # Concatenate
     tmdb_movie_embeddings = np.vstack(all_embeddings)
     print(f"\nFinal embedding shape: {tmdb_movie_embeddings.shape}")
 
-    # Free memory
     del all_embeddings, bert_embeddings
     gc.collect()
 
-    # Save
     np.savez_compressed(
         TMDB_MOVIE_EMBEDDINGS_PATH,
         embeddings=tmdb_movie_embeddings,
@@ -181,7 +167,6 @@ def combine_embeddings() -> bool:
             print("  Skipping...")
             return True
 
-    # Load MovieLens embeddings
     ml_path = MODELS_DIR / "movie_embeddings.npy"
     if not ml_path.exists():
         print(f"✗ MovieLens embeddings not found: {ml_path}")
@@ -192,12 +177,10 @@ def combine_embeddings() -> bool:
     ml_embeddings = np.load(ml_path, allow_pickle=True).item()
     print(f"  MovieLens: {len(ml_embeddings):,} movies")
 
-    # Get embedding dimension
     sample_emb = next(iter(ml_embeddings.values()))
     embedding_dim = len(sample_emb)
     print(f"  Embedding dimension: {embedding_dim}")
 
-    # Load TMDB embeddings (if available)
     tmdb_count = 0
     if TMDB_MOVIE_EMBEDDINGS_PATH.exists():
         print(f"\nLoading TMDB embeddings from {TMDB_MOVIE_EMBEDDINGS_PATH}...")
@@ -206,7 +189,6 @@ def combine_embeddings() -> bool:
         tmdb_ids = tmdb_data["movie_ids"]
         print(f"  TMDB: {len(tmdb_ids):,} movies")
 
-        # Merge (MovieLens takes priority for overlapping IDs)
         combined = dict(ml_embeddings)
         added = 0
         overlapping = 0
@@ -229,14 +211,12 @@ def combine_embeddings() -> bool:
 
     print(f"\nCombined total: {len(combined):,} movies")
 
-    # Save combined embeddings
     print(f"\nSaving combined embeddings...")
     np.save(COMBINED_EMBEDDINGS_PATH, combined)
 
     file_size_mb = COMBINED_EMBEDDINGS_PATH.stat().st_size / 1024 / 1024
     print(f"✓ Saved to {COMBINED_EMBEDDINGS_PATH} ({file_size_mb:.1f} MB)")
 
-    # Save metadata
     metadata = {
         "num_movies": len(combined),
         "embedding_dim": embedding_dim,
@@ -262,19 +242,16 @@ def main():
     print("=" * 80)
     print(f"\nModels directory: {MODELS_DIR}")
 
-    # Step 1: Merge TMDB chunks (if not already done)
     print("\n" + "-" * 40)
     print("Step 1: Merge TMDB BERT embedding chunks")
     print("-" * 40)
     merge_tmdb_chunks()
 
-    # Step 2: Generate TMDB movie embeddings using content-only tower
     print("\n" + "-" * 40)
     print("Step 2: Generate TMDB movie embeddings")
     print("-" * 40)
     generate_tmdb_movie_embeddings()
 
-    # Step 3: Combine MovieLens + TMDB embeddings
     print("\n" + "-" * 40)
     print("Step 3: Combine all embeddings")
     print("-" * 40)

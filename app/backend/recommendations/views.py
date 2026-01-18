@@ -204,7 +204,6 @@ def load_embeddings(request):
 
     embeddings_path = request.data.get("embeddings_path")
     if not embeddings_path:
-        # Use default path
         embeddings_path = Path(settings.EMBEDDINGS_PATH) / "combined_movie_embeddings.npy"
     else:
         embeddings_path = Path(embeddings_path)

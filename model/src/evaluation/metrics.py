@@ -1,8 +1,7 @@
 """
 Evaluation metrics for recommendation systems.
 
-Implements both regression metrics (for rating prediction) and ranking metrics
-(for top-K recommendation quality).
+Implements regression metrics (for rating prediction) and ranking metrics (for top-K recommendation quality).
 """
 
 from typing import Dict, List
@@ -10,10 +9,6 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-
-# ============================================================================
-# Regression Metrics (Rating Prediction)
-# ============================================================================
 
 
 def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
@@ -62,11 +57,6 @@ def evaluate_rating_predictions(
         "rmse": rmse(y_true, y_pred),
         "mae": mae(y_true, y_pred),
     }
-
-
-# ============================================================================
-# Ranking Metrics (Top-K Recommendations)
-# ============================================================================
 
 
 def precision_at_k(
@@ -150,19 +140,14 @@ def ndcg_at_k(
     recommended_k = recommended_items[:k]
     relevant_set = set(relevant_items)
 
-    # Compute DCG (Discounted Cumulative Gain)
     dcg = 0.0
     for i, item in enumerate(recommended_k):
         if item in relevant_set:
-            # Get relevance score (binary or from provided scores)
             rel = relevance_scores.get(item, 1.0) if relevance_scores else 1.0
 
-            # Discount by position (log2(i+2) for 1-indexed positions)
             dcg += rel / np.log2(i + 2)
 
-    # Compute IDCG (Ideal DCG)
     if relevance_scores:
-        # Sort by relevance scores
         ideal_items = sorted(
             relevant_items,
             key=lambda x: relevance_scores.get(x, 0.0),
@@ -170,12 +155,10 @@ def ndcg_at_k(
         )[:k]
         ideal_rels = [relevance_scores.get(item, 1.0) for item in ideal_items]
     else:
-        # Binary relevance: all relevant items have score 1
         ideal_rels = [1.0] * min(len(relevant_items), k)
 
     idcg = sum(rel / np.log2(i + 2) for i, rel in enumerate(ideal_rels))
 
-    # Normalize
     if idcg == 0:
         return 0.0
 
@@ -202,7 +185,7 @@ def mrr(
 
     for i, item in enumerate(recommended_items):
         if item in relevant_set:
-            return 1.0 / (i + 1)  # 1-indexed rank
+            return 1.0 / (i + 1)
 
     return 0.0
 
@@ -230,11 +213,6 @@ def hit_rate_at_k(
     relevant_set = set(relevant_items)
 
     return 1.0 if len(recommended_k & relevant_set) > 0 else 0.0
-
-
-# ============================================================================
-# Evaluation Framework
-# ============================================================================
 
 
 def evaluate_ranking(
@@ -267,14 +245,12 @@ def evaluate_ranking(
 
     results = {}
 
-    # Get common users
     common_users = set(user_relevant_items.keys()) & set(user_recommendations.keys())
 
     if not common_users:
         print("Warning: No common users between relevant items and recommendations")
         return results
 
-    # Compute metrics for each K
     for k in k_values:
         precision_scores = []
         recall_scores = []
@@ -288,7 +264,6 @@ def evaluate_ranking(
             if len(relevant) == 0:
                 continue
 
-            # Get user-specific relevance scores if available
             user_rel_scores = relevance_scores.get(user_id) if relevance_scores else None
 
             precision_scores.append(precision_at_k(relevant, recommended, k))
@@ -296,13 +271,11 @@ def evaluate_ranking(
             ndcg_scores.append(ndcg_at_k(relevant, recommended, k, user_rel_scores))
             hit_rates.append(hit_rate_at_k(relevant, recommended, k))
 
-        # Average across users
         results[f"precision@{k}"] = np.mean(precision_scores) if precision_scores else 0.0
         results[f"recall@{k}"] = np.mean(recall_scores) if recall_scores else 0.0
         results[f"ndcg@{k}"] = np.mean(ndcg_scores) if ndcg_scores else 0.0
         results[f"hit_rate@{k}"] = np.mean(hit_rates) if hit_rates else 0.0
 
-    # Compute MRR (not K-dependent)
     mrr_scores = []
     for user_id in common_users:
         relevant = user_relevant_items[user_id]
@@ -340,11 +313,6 @@ def get_relevant_items_from_test(
             relevant_items[user_id] = relevant
 
     return relevant_items
-
-
-# ============================================================================
-# Coverage Metrics
-# ============================================================================
 
 
 def catalog_coverage(
@@ -392,7 +360,6 @@ def diversity_at_k(
         if len(recs_k) < 2:
             continue
 
-        # Compute pairwise Jaccard distances
         distances = []
         for i in range(len(recs_k)):
             for j in range(i + 1, len(recs_k)):
@@ -402,7 +369,6 @@ def diversity_at_k(
                 if item_i not in item_features or item_j not in item_features:
                     continue
 
-                # Jaccard distance
                 features_i = item_features[item_i]
                 features_j = item_features[item_j]
 

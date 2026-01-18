@@ -26,8 +26,8 @@ class RecommendationEngine:
     - TMDB (for movie metadata)
     """
 
-    _ml_to_tmdb_cache = None  # Class-level cache for ID mapping
-    _tmdb_to_ml_cache = None  # Reverse mapping cache
+    _ml_to_tmdb_cache = None
+    _tmdb_to_ml_cache = None
 
     def __init__(self):
         self.qdrant = QdrantService()
@@ -45,7 +45,6 @@ class RecommendationEngine:
         cls._ml_to_tmdb_cache = {}
         model_data_path = Path("/data/model_data")
 
-        # Try different dataset locations
         for dataset in ["ml-32m", "ml-latest-small"]:
             links_path = model_data_path / "raw" / dataset / "links.csv"
             if links_path.exists():
@@ -73,7 +72,6 @@ class RecommendationEngine:
         if cls._tmdb_to_ml_cache is not None:
             return cls._tmdb_to_ml_cache
 
-        # Build reverse mapping from ml_to_tmdb
         ml_to_tmdb = cls._load_ml_to_tmdb_mapping()
         cls._tmdb_to_ml_cache = {v: k for k, v in ml_to_tmdb.items()}
         return cls._tmdb_to_ml_cache
@@ -90,7 +88,6 @@ class RecommendationEngine:
 
         embeddings_path = Path(settings.EMBEDDINGS_PATH)
 
-        # Try to load movie embeddings metadata
         metadata_path = embeddings_path / "movie_embeddings_metadata.json"
         if metadata_path.exists():
             with open(metadata_path) as f:
@@ -100,8 +97,6 @@ class RecommendationEngine:
         else:
             self._movie_id_map = {}
 
-        # User ID mapping would come from training data
-        # For now, we'll use movielens_user_id directly as index
         self._user_id_map = {}
 
     def get_for_you_recommendations(
@@ -119,24 +114,18 @@ class RecommendationEngine:
         """
         self._load_id_mappings()
 
-        # Get user's rated movies for exclusion
         exclude_ids = []
         if exclude_rated:
             exclude_ids = list(user.ratings.values_list("tmdb_id", flat=True))
 
-        # Get user embedding
         if user.movielens_user_id and not user.is_cold_start:
-            # Existing user - use TF Serving
             user_embedding = self.tf_client.get_user_embedding(user.movielens_user_id)
         else:
-            # Cold-start user - use preference-based embedding
             user_embedding = self._get_cold_start_embedding(user)
 
         if not user_embedding:
-            # Fallback to popular movies
             return self._get_popular_fallback(limit, exclude_ids)
 
-        # Search Qdrant
         results = self.qdrant.search_similar(
             query_vector=user_embedding,
             limit=limit,
@@ -154,40 +143,33 @@ class RecommendationEngine:
         2. Weight by rating
         3. Average to create user profile
         """
-        # Get user's ratings
         ratings = user.ratings.all()
 
         if not ratings.exists():
-            # No ratings yet - use genre preferences
             preferences = user.preferences.filter(preference_type="genre")
             if not preferences.exists():
                 return None
 
-            # This is a simplified approach - in production you'd use the content-only tower
-            # For now, return None to trigger fallback
             return None
 
-        # Get embeddings for rated movies
         movie_ids = [r.tmdb_id for r in ratings]
         embeddings = self.qdrant.get_multiple_embeddings(movie_ids)
 
         if not embeddings:
             return None
 
-        # Weight by rating (normalize to 0-1)
         weighted_sum = np.zeros(128)
         total_weight = 0
 
         for rating in ratings:
             if rating.tmdb_id in embeddings:
-                weight = rating.rating / 5.0  # Normalize rating to 0-1
+                weight = rating.rating / 5.0
                 weighted_sum += np.array(embeddings[rating.tmdb_id]) * weight
                 total_weight += weight
 
         if total_weight == 0:
             return None
 
-        # Average and normalize
         user_embedding = weighted_sum / total_weight
         user_embedding = user_embedding / np.linalg.norm(user_embedding)
 
@@ -199,25 +181,21 @@ class RecommendationEngine:
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """Get movies similar to a given movie using vector similarity."""
-        # movie_id is a TMDB ID, need to convert to MovieLens ID for Qdrant lookup
         ml_id = self._tmdb_to_ml(movie_id)
 
         if not ml_id:
             logger.info(f"No MovieLens ID found for TMDB ID {movie_id}, falling back to TMDB")
             return self.tmdb.get_similar_movies(movie_id)
 
-        # Get movie embedding using MovieLens ID
         movie_embedding = self.qdrant.get_movie_embedding(ml_id)
 
         if not movie_embedding:
-            # Fallback to TMDB similar
             logger.info(f"No embedding found for ML ID {ml_id}, falling back to TMDB")
             return self.tmdb.get_similar_movies(movie_id)
 
-        # Search Qdrant (exclude the query movie's MovieLens ID)
         results = self.qdrant.search_similar(
             query_vector=movie_embedding,
-            limit=limit + 1,  # +1 to exclude the query movie
+            limit=limit + 1,
             exclude_ids=[ml_id],
         )
 
@@ -233,7 +211,6 @@ class RecommendationEngine:
 
         Returns movies similar to the most recently watched/rated movie.
         """
-        # Get most recent rating
         recent_rating = user.ratings.order_by("-created_at").first()
 
         if not recent_rating:
@@ -241,7 +218,6 @@ class RecommendationEngine:
 
         similar = self.get_similar_movies(recent_rating.tmdb_id, limit=limit)
 
-        # Add context
         return {
             "based_on": recent_rating.tmdb_id,
             "movies": similar,
@@ -258,8 +234,6 @@ class RecommendationEngine:
         if user:
             exclude_ids = list(user.ratings.values_list("tmdb_id", flat=True))
 
-        # For genre filtering, we'd need genre metadata in Qdrant payloads
-        # For now, use TMDB as fallback
         genre_map = {
             "action": 28,
             "adventure": 12,
@@ -299,7 +273,6 @@ class RecommendationEngine:
         """Fallback to popular movies when personalization fails."""
         popular = self.tmdb.get_popular_movies()
 
-        # Filter out excluded
         filtered = [m for m in popular if m["tmdb_id"] not in exclude_ids]
 
         return filtered[:limit]
@@ -309,7 +282,6 @@ class RecommendationEngine:
         if not release_date:
             return None
         if isinstance(release_date, str):
-            # Format: "YYYY-MM-DD"
             try:
                 return int(release_date[:4])
             except (ValueError, IndexError):
@@ -326,15 +298,13 @@ class RecommendationEngine:
         enriched = []
 
         for result in results:
-            # Qdrant stores MovieLens IDs, need to convert to TMDB IDs
-            ml_id = result["tmdb_id"]  # This is actually MovieLens ID
+            ml_id = result["tmdb_id"]
             tmdb_id = self._ml_to_tmdb(ml_id)
 
             if not tmdb_id:
                 logger.warning(f"No TMDB mapping for MovieLens ID {ml_id}")
                 continue
 
-            # Try to get from cache
             try:
                 movie = Movie.objects.get(tmdb_id=tmdb_id)
                 enriched.append(
@@ -349,7 +319,6 @@ class RecommendationEngine:
                     }
                 )
             except Movie.DoesNotExist:
-                # Fetch from TMDB and cache
                 movie_data = self.tmdb.get_movie(tmdb_id)
                 if movie_data:
                     movie, _ = Movie.objects.get_or_create(
@@ -383,11 +352,9 @@ class RecommendationEngine:
 
     def get_seed_movies_for_onboarding(self, count: int = 20) -> List[Dict[str, Any]]:
         """Get diverse, popular movies for new user onboarding."""
-        # Get a mix of popular movies from different genres
         popular = self.tmdb.get_popular_movies()
         top_rated = self.tmdb.get_top_rated_movies()
 
-        # Combine and dedupe
         seen = set()
         movies = []
 

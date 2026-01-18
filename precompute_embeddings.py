@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Pre-compute BERT embeddings for movie overviews.
 
@@ -44,7 +43,6 @@ def precompute_bert_embeddings(
     print("Pre-computing BERT Embeddings for Movie Overviews")
     print("=" * 80)
 
-    # Check if already computed
     output_path = MODELS_DIR / output_file
     if output_path.exists() and not force:
         print(f"\n✓ Embeddings already exist at {output_path}")
@@ -53,7 +51,6 @@ def precompute_bert_embeddings(
 
     print_config()
 
-    # Load movies
     movies_file = PROCESSED_DIR / "movies.parquet"
     if not movies_file.exists():
         print(f"✗ Movies file not found: {movies_file}")
@@ -64,33 +61,27 @@ def precompute_bert_embeddings(
     movies_df = pl.read_parquet(movies_file).to_pandas()
     print(f"  Loaded {len(movies_df):,} movies")
 
-    # Get movie IDs and overviews
     movie_ids = movies_df["movieId"].tolist()
 
-    # Get overview column
     if "overview" in movies_df.columns:
         overviews = movies_df["overview"].fillna("").tolist()
     else:
         print("  ⚠ No overview column found, using empty strings")
         overviews = [""] * len(movie_ids)
 
-    # Get title for fallback
     title_col = "title_ml" if "title_ml" in movies_df.columns else "title"
     titles = movies_df[title_col].fillna("").tolist()
 
-    # Combine title + overview for better embeddings
     texts = []
     for title, overview in zip(titles, overviews):
         if overview and len(overview) > 10:
             text = f"{title}. {overview}"
         else:
             text = title
-        # Truncate to BERT max length
         texts.append(text[:512])
 
     print(f"  Prepared {len(texts):,} texts for encoding")
 
-    # Load BERT
     print("\nLoading BERT model from TensorFlow Hub...")
     bert_preprocess_url = "https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3"
     bert_encoder_url = "https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-512_A-8/2"
@@ -99,7 +90,6 @@ def precompute_bert_embeddings(
     bert_encoder = hub.KerasLayer(bert_encoder_url)
     print("  ✓ BERT loaded")
 
-    # Compute embeddings in batches
     print(f"\nComputing embeddings (batch_size={batch_size})...")
     embeddings = []
     num_batches = (len(texts) + batch_size - 1) // batch_size
@@ -108,29 +98,23 @@ def precompute_bert_embeddings(
         batch_texts = texts[i : i + batch_size]
         batch_num = i // batch_size + 1
 
-        # Preprocess and encode
         preprocessed = bert_preprocess(batch_texts)
         batch_embeddings = bert_encoder(preprocessed)["pooled_output"].numpy()
         embeddings.append(batch_embeddings)
 
-        # Progress
         if batch_num % 100 == 0 or batch_num == num_batches:
             print(f"  Batch {batch_num}/{num_batches} ({i + len(batch_texts):,}/{len(texts):,} movies)")
 
-        # Force garbage collection every 500 batches to prevent memory buildup
         if batch_num % 500 == 0:
             gc.collect()
 
-    # Concatenate all embeddings
     print("\nConcatenating embeddings...")
     all_embeddings = np.vstack(embeddings)
     print(f"  Shape: {all_embeddings.shape}")
 
-    # Create output directory
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = MODELS_DIR / output_file
 
-    # Save as compressed npz with movie ID mapping
     print(f"\nSaving to {output_path}...")
     np.savez_compressed(
         output_path,
@@ -138,7 +122,6 @@ def precompute_bert_embeddings(
         movie_ids=np.array(movie_ids),
     )
 
-    # Also save a JSON metadata file
     metadata = {
         "num_movies": len(movie_ids),
         "embedding_dim": all_embeddings.shape[1],
@@ -167,9 +150,6 @@ def precompute_tmdb_bert_embeddings(
     """
     Pre-compute BERT embeddings for ALL TMDB movies (1.3M+).
 
-    This enables cold-start recommendations for movies not in MovieLens.
-    Uses chunk-based processing with checkpointing to avoid OOM and allow resuming.
-
     Args:
         batch_size: Number of texts to encode at once (lower = less memory)
         output_file: Output filename
@@ -182,19 +162,16 @@ def precompute_tmdb_bert_embeddings(
 
     print_config()
 
-    # Check if TMDB file exists
     if not TMDB_FILE.exists():
         print(f"✗ TMDB file not found: {TMDB_FILE}")
         print("  Run: bash model/data/download_tmdb.sh")
         return
 
-    # Create checkpoint directory
     checkpoint_dir = MODELS_DIR / "tmdb_chunks"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\nLoading TMDB data from {TMDB_FILE}...")
 
-    # Load only needed columns to save memory
     tmdb_df = pd.read_csv(
         TMDB_FILE,
         usecols=["id", "title", "overview"],
@@ -204,39 +181,33 @@ def precompute_tmdb_bert_embeddings(
 
     print(f"  Loaded {len(tmdb_df):,} TMDB movies")
 
-    # Filter out movies without overview (no text to embed)
     tmdb_df = tmdb_df[tmdb_df["overview"].notna() & (tmdb_df["overview"].str.len() > 10)]
     print(f"  {len(tmdb_df):,} movies have valid overviews")
 
-    # Optional: limit for testing
     if max_movies is not None:
         tmdb_df = tmdb_df.head(max_movies)
         print(f"  Limited to {len(tmdb_df):,} movies (max_movies={max_movies})")
 
-    # Get movie IDs and texts
     movie_ids = tmdb_df["id"].values
     titles = tmdb_df["title"].fillna("").values
     overviews = tmdb_df["overview"].fillna("").values
 
-    # Combine title + overview for better embeddings
     texts = []
     for title, overview in zip(titles, overviews):
         text = f"{title}. {overview}" if overview else title
-        texts.append(text[:512])  # Truncate to BERT max length
+        texts.append(text[:512])
 
     total_movies = len(texts)
     num_chunks = (total_movies + chunk_size - 1) // chunk_size
     print(f"  Prepared {total_movies:,} texts for encoding")
     print(f"  Will process in {num_chunks} chunks of {chunk_size:,} movies each")
 
-    # Check for existing chunks (resume support)
     existing_chunks = sorted(checkpoint_dir.glob("chunk_*.npz"))
     start_chunk = len(existing_chunks)
 
     if start_chunk > 0:
         print(f"\n✓ Found {start_chunk} existing chunks. Resuming from chunk {start_chunk + 1}...")
 
-    # Load BERT
     print("\nLoading BERT model from TensorFlow Hub...")
     bert_preprocess_url = "https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3"
     bert_encoder_url = "https://tfhub.dev/tensorflow/small_bert/bert_en_uncased_L-4_H-512_A-8/2"
@@ -245,7 +216,6 @@ def precompute_tmdb_bert_embeddings(
     bert_encoder = hub.KerasLayer(bert_encoder_url)
     print("  ✓ BERT loaded")
 
-    # Process chunks
     print(f"\nComputing embeddings (batch_size={batch_size}, chunk_size={chunk_size:,})...")
 
     for chunk_idx in range(start_chunk, num_chunks):
@@ -256,7 +226,6 @@ def precompute_tmdb_bert_embeddings(
 
         print(f"\n--- Chunk {chunk_idx + 1}/{num_chunks} (movies {chunk_start:,}-{chunk_end:,}) ---")
 
-        # Process this chunk in batches
         chunk_embeddings = []
         num_batches = (len(chunk_texts) + batch_size - 1) // batch_size
 
@@ -265,31 +234,25 @@ def precompute_tmdb_bert_embeddings(
             batch_num = i // batch_size + 1
 
             try:
-                # Preprocess and encode
                 preprocessed = bert_preprocess(batch_texts)
                 batch_embeddings = bert_encoder(preprocessed)["pooled_output"].numpy()
                 chunk_embeddings.append(batch_embeddings)
             except Exception as e:
                 print(f"  ⚠️  Error in batch {batch_num}: {e}")
-                # Add zero embeddings for failed batch
                 chunk_embeddings.append(np.zeros((len(batch_texts), 512), dtype=np.float32))
 
-            # Progress every 100 batches
             if batch_num % 100 == 0 or batch_num == num_batches:
                 progress = (chunk_start + i + len(batch_texts)) / total_movies * 100
                 print(f"  Batch {batch_num}/{num_batches} - Total progress: {progress:.1f}%")
 
-        # Concatenate and save this chunk
         chunk_emb_array = np.vstack(chunk_embeddings)
         chunk_path = checkpoint_dir / f"chunk_{chunk_idx:04d}.npz"
         np.savez_compressed(chunk_path, embeddings=chunk_emb_array, movie_ids=chunk_ids)
         print(f"  ✓ Saved chunk {chunk_idx + 1} to {chunk_path.name} ({chunk_emb_array.shape[0]:,} movies)")
 
-        # Clear memory
         del chunk_embeddings, chunk_emb_array
         gc.collect()
 
-    # Merge all chunks into final file
     print("\n" + "=" * 80)
     print("Merging all chunks into final file...")
 
@@ -308,7 +271,6 @@ def precompute_tmdb_bert_embeddings(
 
     print(f"  Final shape: {final_embeddings.shape}")
 
-    # Save final file
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     output_path = MODELS_DIR / output_file
 
@@ -319,7 +281,6 @@ def precompute_tmdb_bert_embeddings(
         movie_ids=final_movie_ids,
     )
 
-    # Save metadata
     metadata = {
         "num_movies": len(final_movie_ids),
         "embedding_dim": final_embeddings.shape[1],
@@ -334,7 +295,6 @@ def precompute_tmdb_bert_embeddings(
     print(f"  ✓ Saved {output_path.name} ({file_size_mb:.1f} MB)")
     print(f"  ✓ Saved {metadata_path.name}")
 
-    # Optionally clean up chunks
     print("\nCleaning up chunk files...")
     for chunk_path in all_chunks:
         chunk_path.unlink()
@@ -389,7 +349,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.all:
-        # Both MovieLens and TMDB (skips if already computed)
         print("Computing embeddings for MovieLens movies...")
         precompute_bert_embeddings(batch_size=args.batch_size, force=args.force)
         print("\n" + "=" * 80 + "\n")
@@ -400,12 +359,10 @@ if __name__ == "__main__":
             chunk_size=args.chunk_size,
         )
     elif args.tmdb:
-        # TMDB only (has checkpoint support)
         precompute_tmdb_bert_embeddings(
             batch_size=args.batch_size,
             max_movies=args.max_movies,
             chunk_size=args.chunk_size,
         )
     else:
-        # Default: MovieLens only
         precompute_bert_embeddings(batch_size=args.batch_size, force=args.force)

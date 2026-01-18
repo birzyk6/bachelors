@@ -24,10 +24,8 @@ import seaborn as sns
 
 from .plots import COLORS, MODEL_COLORS, POLISH_LABELS, get_model_name_pl, set_thesis_style
 
-# Extended Polish labels for model evaluation
 MODEL_LABELS = {
     **POLISH_LABELS,
-    # Titles
     "rmse_comparison": "Porównanie błędu RMSE między modelami",
     "mae_comparison": "Porównanie błędu MAE między modelami",
     "ndcg_comparison": "Porównanie jakości rankingu (NDCG@K)",
@@ -38,13 +36,11 @@ MODEL_LABELS = {
     "error_by_genre": "Analiza błędów predykcji według gatunku",
     "rating_vs_predicted": "Oceny rzeczywiste vs przewidywane",
     "error_distribution": "Rozkład błędów predykcji",
-    # Axis labels
     "k_value": "Liczba rekomendacji (K)",
     "metric_value": "Wartość metryki",
     "prediction_error": "Błąd predykcji",
     "actual_rating": "Ocena rzeczywista",
     "predicted_rating": "Ocena przewidywana",
-    # Legend
     "lower_better": "(im niżej, tym lepiej)",
     "higher_better": "(im wyżej, tym lepiej)",
 }
@@ -72,7 +68,6 @@ def load_all_results(metrics_dir: Path) -> Dict:
             with open(filepath) as f:
                 data = json.load(f)
 
-            # Extract metrics
             test_metrics = data.get("test_metrics", {})
             val_metrics = data.get("val_metrics", {})
             metrics = test_metrics if test_metrics else val_metrics
@@ -83,7 +78,6 @@ def load_all_results(metrics_dir: Path) -> Dict:
                     "mae": metrics.get("mae"),
                 }
 
-                # Extract ranking metrics if available
                 ranking_metrics = {}
                 for key in [
                     "ndcg@5",
@@ -104,7 +98,6 @@ def load_all_results(metrics_dir: Path) -> Dict:
                 if ranking_metrics:
                     results["ranking"][model_name] = ranking_metrics
 
-            # Extract training history if available
             if "training_history" in data:
                 results["training_history"][model_name] = data["training_history"]
             elif "history" in data:
@@ -128,7 +121,6 @@ def plot_rmse_mae_comparison(
         print("    ⚠ Brak wyników predykcji ocen")
         return
 
-    # Extract metrics
     models = []
     rmse_values = []
     mae_values = []
@@ -148,7 +140,6 @@ def plot_rmse_mae_comparison(
     x = np.arange(len(models))
     width = 0.6
 
-    # RMSE plot
     ax1 = axes[0]
     colors = [
         MODEL_COLORS.get(m.lower().replace(" ", "_").replace("-", "_"), COLORS[0]) for m in results["rating_prediction"].keys()
@@ -174,12 +165,10 @@ def plot_rmse_mae_comparison(
     ax1.set_ylim(0, max(rmse_values) * 1.15)
     ax1.grid(axis="y", alpha=0.3)
 
-    # Highlight best model
     best_idx = np.argmin(rmse_values)
     bars1[best_idx].set_edgecolor("gold")
     bars1[best_idx].set_linewidth(3)
 
-    # MAE plot
     ax2 = axes[1]
     bars2 = ax2.bar(x, mae_values, width, color=colors, edgecolor="black", alpha=0.8)
 
@@ -203,7 +192,6 @@ def plot_rmse_mae_comparison(
     ax2.set_ylim(0, max(mae_values) * 1.15 if max(mae_values) > 0 else 1)
     ax2.grid(axis="y", alpha=0.3)
 
-    # Highlight best model
     if max(mae_values) > 0:
         best_idx = np.argmin([v if v > 0 else float("inf") for v in mae_values])
         bars2[best_idx].set_edgecolor("gold")
@@ -247,7 +235,6 @@ def plot_ndcg_comparison(
             x + offset, ndcg_values, width, label=get_model_name_pl(model_name), color=color, edgecolor="black", alpha=0.8
         )
 
-        # Add value labels
         for bar, val in zip(bars, ndcg_values):
             if val > 0:
                 ax.text(
@@ -294,7 +281,6 @@ def plot_recall_precision_curves(
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    # Recall@K curves
     ax1 = axes[0]
     for model_name, metrics in results["ranking"].items():
         recalls = [metrics.get(f"recall@{k}", 0) for k in k_values]
@@ -309,7 +295,6 @@ def plot_recall_precision_curves(
     ax1.legend(loc="best", frameon=True, shadow=True)
     ax1.grid(alpha=0.3)
 
-    # Precision@K curves
     ax2 = axes[1]
     for model_name, metrics in results["ranking"].items():
         precisions = [metrics.get(f"precision@{k}", 0) for k in k_values]
@@ -364,10 +349,8 @@ def plot_learning_curves_all(
     for ax, (model_name, history) in zip(axes, models_with_history):
         epochs = range(1, len(history["loss"]) + 1)
 
-        # Training loss
         ax.plot(epochs, history["loss"], "o-", label="Strata treningowa", color=COLORS[0], linewidth=2, markersize=4)
 
-        # Validation loss
         if "val_loss" in history:
             ax.plot(epochs, history["val_loss"], "s-", label="Strata walidacyjna", color=COLORS[1], linewidth=2, markersize=4)
 
@@ -377,7 +360,6 @@ def plot_learning_curves_all(
         ax.legend(loc="best", frameon=True)
         ax.grid(alpha=0.3)
 
-        # Mark minimum validation loss
         if "val_loss" in history:
             min_idx = np.argmin(history["val_loss"])
             ax.axvline(min_idx + 1, color="red", linestyle="--", alpha=0.5)
@@ -405,11 +387,9 @@ def plot_metrics_radar(
         print("    ⚠ Brak wyników rankingu")
         return
 
-    # Metrics to include (normalize to 0-1 scale)
     metrics_to_plot = ["ndcg@10", "recall@10", "precision@10", "mrr", "hit_rate@10"]
     metric_labels = ["NDCG@10", "Recall@10", "Precision@10", "MRR", "Hit Rate@10"]
 
-    # Filter to available metrics
     available_metrics = []
     available_labels = []
     for m, l in zip(metrics_to_plot, metric_labels):
@@ -421,16 +401,15 @@ def plot_metrics_radar(
         print("    ⚠ Za mało metryk do wykresu radarowego")
         return
 
-    # Number of variables
     num_vars = len(available_metrics)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]  # Complete the loop
+    angles += angles[:1]
 
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
 
     for model_name, metrics in results["ranking"].items():
         values = [metrics.get(m, 0) for m in available_metrics]
-        values += values[:1]  # Complete the loop
+        values += values[:1]
 
         color = MODEL_COLORS.get(model_name, COLORS[0])
         ax.plot(angles, values, "o-", linewidth=2, label=get_model_name_pl(model_name), color=color)
@@ -461,10 +440,8 @@ def plot_model_comparison_summary(
 
     print("  Tworzenie podsumowania modeli...")
 
-    # Collect all metrics
     all_metrics = {}
 
-    # Rating prediction metrics
     for model_name, metrics in results.get("rating_prediction", {}).items():
         if model_name not in all_metrics:
             all_metrics[model_name] = {}
@@ -473,7 +450,6 @@ def plot_model_comparison_summary(
         if metrics.get("mae"):
             all_metrics[model_name]["MAE"] = metrics["mae"]
 
-    # Ranking metrics
     for model_name, metrics in results.get("ranking", {}).items():
         if model_name not in all_metrics:
             all_metrics[model_name] = {}
@@ -485,23 +461,18 @@ def plot_model_comparison_summary(
         print("    ⚠ Brak metryk do podsumowania")
         return
 
-    # Create DataFrame
     df = pd.DataFrame(all_metrics).T
     df.index = [get_model_name_pl(m) for m in df.index]
 
-    # Create heatmap
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Normalize for visualization (reverse for RMSE/MAE where lower is better)
     df_norm = df.copy()
     for col in df_norm.columns:
         if col in ["RMSE", "MAE"]:
-            # Invert so higher is better (for consistent color scheme)
             df_norm[col] = 1 - (df_norm[col] - df_norm[col].min()) / (df_norm[col].max() - df_norm[col].min() + 1e-8)
         else:
             df_norm[col] = (df_norm[col] - df_norm[col].min()) / (df_norm[col].max() - df_norm[col].min() + 1e-8)
 
-    # Create annotations with original values
     annot = df.round(4).astype(str)
 
     sns.heatmap(
@@ -540,11 +511,9 @@ def generate_all_model_plots(
     print("Generowanie wykresów ewaluacji modeli")
     print("=" * 80)
 
-    # Create output directory
     model_dir = output_dir / "models"
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load all results
     print("\nŁadowanie wyników...")
     results = load_all_results(metrics_dir)
 
@@ -554,29 +523,22 @@ def generate_all_model_plots(
 
     print(f"  Załadowano wyniki dla {len(results['rating_prediction'])} modeli")
 
-    # Generate plots
     print("\nGenerowanie wykresów...")
 
-    # 1. RMSE/MAE comparison
     plot_rmse_mae_comparison(results, model_dir)
 
-    # 2. NDCG comparison
     if results.get("ranking"):
         plot_ndcg_comparison(results, model_dir / "porownanie_ndcg.png")
 
-    # 3. Recall/Precision curves
     if results.get("ranking"):
         plot_recall_precision_curves(results, model_dir)
 
-    # 4. Learning curves
     if results.get("training_history"):
         plot_learning_curves_all(results, model_dir)
 
-    # 5. Metrics radar chart
     if results.get("ranking"):
         plot_metrics_radar(results, model_dir / "wykres_radarowy.png")
 
-    # 6. Summary heatmap
     plot_model_comparison_summary(results, model_dir / "podsumowanie_modeli.png")
 
     print("\n" + "=" * 80)

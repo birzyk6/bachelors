@@ -40,7 +40,6 @@ class TFServingClient:
 
             if predictions:
                 embedding = predictions[0]
-                # Normalize to unit vector
                 embedding = np.array(embedding)
                 embedding = embedding / np.linalg.norm(embedding)
                 return embedding.tolist()
